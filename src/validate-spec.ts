@@ -1,7 +1,9 @@
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { exportSpecification } from './docs/export-spec';
-import { ALL_ENDPOINTS } from './docs/endpoints';
-import { MODULES } from './docs/modules-data';
+import path from 'path';
+import { pathToFileURL } from 'url';
+import { exportSpecification } from './docs/export-spec.js';
+import { ALL_ENDPOINTS } from './docs/endpoints/index.js';
+import { MODULES } from './docs/modules-data.js';
 
 async function validateOpenApiSpecification() {
   console.log('====================================================');
@@ -85,7 +87,11 @@ async function validateOpenApiSpecification() {
   console.log('====================================================\n');
 }
 
-if (require.main === module) {
+const isMainModule = process.argv[1]
+  ? import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
+  : false;
+
+if (isMainModule) {
   validateOpenApiSpecification().catch(err => {
     console.error('Fatal error during validation:', err);
     process.exit(1);

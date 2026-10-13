@@ -1,4 +1,4 @@
-import { EndpointSpec } from '../spec-types';
+import type { EndpointSpec } from '../spec-types.js';
 
 export const BOOKING_ENDPOINTS: EndpointSpec[] = [
   {

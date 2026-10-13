@@ -1,10 +1,12 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
-import { generateOpenApiSpec } from './docs/openapi-generator';
-import { ALL_ENDPOINTS } from './docs/endpoints';
-import { MODULES } from './docs/modules-data';
+import { generateOpenApiSpec } from './docs/openapi-generator.js';
+import { ALL_ENDPOINTS } from './docs/endpoints/index.js';
+import { MODULES } from './docs/modules-data.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -18,7 +20,8 @@ app.use(express.urlencoded({ extended: true }));
 const openApiSpec = generateOpenApiSpec();
 
 // Public Static Assets
-const publicDir = path.join(__dirname, 'public');
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const publicDir = path.join(currentDir, 'public');
 app.use(express.static(publicDir));
 
 // 1. Authoritative OpenAPI Spec Endpoints
@@ -93,7 +96,7 @@ app.use('/api/v1', (req: Request, res: Response) => {
   res.setHeader('X-DermaCare-MVP-Audit', 'Proposed-Contract-Simulation');
 
   if (matchedEp) {
-    const defaultResponse = matchedEp.responses.find(r => r.statusCode < 300) || matchedEp.responses[0];
+    const defaultResponse = matchedEp.responses.find(r => r.statusCode < 300) || matchedEp.responses[0]!;
     const isSuccess = defaultResponse.statusCode < 300;
 
     return res.status(defaultResponse.statusCode).json({
@@ -147,7 +150,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Start Server
-if (require.main === module) {
+const isMainModule = process.argv[1]
+  ? import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
+  : false;
+
+if (isMainModule) {
   app.listen(PORT, () => {
     console.log(`\n============================================================`);
     console.log(`🚀 DermaCare AI Premium Documentation Portal is LIVE!`);
