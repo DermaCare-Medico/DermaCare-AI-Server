@@ -1,17 +1,20 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 import * as yaml from 'yaml';
-import { generateOpenApiSpec } from './openapi-generator';
-import { ALL_ENDPOINTS } from './endpoints';
-import { MODULES } from './modules-data';
+import { generateOpenApiSpec } from './openapi-generator.js';
+import { ALL_ENDPOINTS } from './endpoints/index.js';
+import { MODULES } from './modules-data.js';
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
 export function exportSpecification() {
   const spec = generateOpenApiSpec();
   const specJson = JSON.stringify(spec, null, 2);
   const specYaml = yaml.stringify(spec);
 
-  const rootDir = path.resolve(__dirname, '../../');
-  const srcPublicDir = path.resolve(__dirname, '../public');
+  const rootDir = path.resolve(currentDir, '../../');
+  const srcPublicDir = path.resolve(currentDir, '../public');
   const distPublicDir = path.resolve(rootDir, 'dist/public');
 
   if (!fs.existsSync(srcPublicDir)) {
@@ -64,7 +67,11 @@ export function exportSpecification() {
   return spec;
 }
 
-if (require.main === module) {
+const isMainModule = process.argv[1]
+  ? import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
+  : false;
+
+if (isMainModule) {
   exportSpecification();
 }
 

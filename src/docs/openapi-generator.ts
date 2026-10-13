@@ -1,5 +1,5 @@
-import { ALL_ENDPOINTS } from './endpoints';
-import { MODULES } from './modules-data';
+import { ALL_ENDPOINTS } from './endpoints/index.js';
+import { MODULES } from './modules-data.js';
 
 export function generateOpenApiSpec() {
   const paths: Record<string, any> = {};

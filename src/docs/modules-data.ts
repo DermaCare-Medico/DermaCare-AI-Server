@@ -1,4 +1,4 @@
-import { ModuleDef } from './spec-types';
+import type { ModuleDef } from './spec-types.js';
 
 export const MODULES: ModuleDef[] = [
   {
