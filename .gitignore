@@ -5,4 +5,8 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+# AI model weights
+model/**/*.onnx
+model/**/*.pt
+model/**/*.safetensors
 
