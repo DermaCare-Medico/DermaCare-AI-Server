@@ -1,0 +1,18 @@
+{
+  "model": "veritaderm.onnx",
+  "inferenceTimeMs": 2388.25,
+  "totalDetections": 1,
+  "detections": [
+    {
+      "classId": 0,
+      "className": "Acne",
+      "confidence": 0.3519,
+      "boundingBox": {
+        "x": 172,
+        "y": 342,
+        "width": 23,
+        "height": 34
+      }
+    }
+  ]
+}
