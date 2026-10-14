@@ -20,7 +20,7 @@ const MODEL_PATH = path.join(
 const IMAGE_PATH = path.join(
   ROOT,
   "test-images",
-  "skin-test.jpg"
+  "skin-test-5.jpg"
 );
 
 const OUTPUT_DIR = path.join(ROOT, "test-results");
@@ -54,17 +54,17 @@ async function preprocessImage(imagePath) {
     throw new Error("Invalid image dimensions");
   }
 
-  // Normalize orientation into a buffer first
-  const orientedBuffer = await sharp(imagePath)
-    .rotate()
-    .toBuffer();
+  // Account for EXIF orientations that swap image dimensions
+  const swapsDimensions =
+    metadata.orientation >= 5 && metadata.orientation <= 8;
 
-  const orientedMetadata = await sharp(
-    orientedBuffer
-  ).metadata();
+  const originalWidth = swapsDimensions
+    ? metadata.height
+    : metadata.width;
 
-  const originalWidth = orientedMetadata.width;
-  const originalHeight = orientedMetadata.height;
+  const originalHeight = swapsDimensions
+    ? metadata.width
+    : metadata.height;
 
   // Preserve aspect ratio
   const scale = Math.min(
@@ -89,7 +89,8 @@ async function preprocessImage(imagePath) {
   );
 
   // Explicit letterboxing
-  const resized = await sharp(orientedBuffer)
+  const resized = await sharp(imagePath)
+    .rotate()
     .resize(resizedWidth, resizedHeight, {
       fit: "fill",
     })
@@ -153,7 +154,7 @@ async function preprocessImage(imagePath) {
 
   return {
     tensor,
-    orientedBuffer,
+    imagePath,
     originalWidth,
     originalHeight,
     scale,
@@ -496,7 +497,8 @@ async function drawDetections(
     </svg>
   `;
 
-  await sharp(imageInfo.orientedBuffer)
+  await sharp(imageInfo.imagePath)
+    .rotate()
     .composite([
       { input: Buffer.from(svg) },
     ])
