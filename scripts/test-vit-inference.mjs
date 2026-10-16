@@ -29,7 +29,7 @@ const PREPROCESSOR_CONFIG_PATH = path.join(
 const IMAGE_PATH = path.join(
   ROOT,
   "test-images",
-  "skin-test-5.jpg"
+  "skin-test-2.jpg"
 );
 
 async function loadJson(filePath) {
