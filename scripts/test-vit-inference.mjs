@@ -156,15 +156,37 @@ async function main() {
     executionProviders: ["cpu"],
   });
 
-  if (!session.inputNames.includes("pixel_values")) {
-    throw new Error(
-      `Model does not expose pixel_values; inputs: ${session.inputNames.join(", ")}`
-    );
-  }
+  // Check RAM usage after loading ONNX model
+const memory = process.memoryUsage();
+
+console.log(
+  "RAM after model loading:",
+  (memory.rss / 1024 / 1024).toFixed(2),
+  "MB"
+);
+
+if (!session.inputNames.includes("pixel_values")) {
+  throw new Error(
+    `Model does not expose pixel_values; inputs: ${session.inputNames.join(", ")}`
+  );
+}
+
+  // if (!session.inputNames.includes("pixel_values")) {
+  //   throw new Error(
+  //     `Model does not expose pixel_values; inputs: ${session.inputNames.join(", ")}`
+  //   );
+  // }
 
   const outputs = await session.run({
     pixel_values: inputTensor,
   });
+
+// RAM usage after inference
+console.log(
+  "RAM after inference:",
+  (process.memoryUsage().rss / 1024 / 1024).toFixed(2),
+  "MB"
+);
 
   const logitsTensor = outputs.logits;
 
@@ -218,3 +240,29 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+if (global.gc) {
+  global.gc();
+}
+
+const memory = process.memoryUsage();
+
+console.log("\n--- Memory Usage ---");
+
+console.log(
+  "RSS:",
+  (memory.rss / 1024 / 1024).toFixed(2),
+  "MB"
+);
+
+console.log(
+  "Heap Used:",
+  (memory.heapUsed / 1024 / 1024).toFixed(2),
+  "MB"
+);
+
+console.log(
+  "External:",
+  (memory.external / 1024 / 1024).toFixed(2),
+  "MB"
+);
