@@ -1,5 +1,5 @@
-
-import { rateLimit } from "express-rate-limit";
+import type { Request } from "express";
+import { rateLimit, ipKeyGenerator } from "express-rate-limit";
 import { AUTH_RATE_LIMITS } from "../shared/constants/auth.constants.js";
 
 const createRateLimiter = (
@@ -17,6 +17,12 @@ const createRateLimiter = (
       message,
     },
   });
+
+// Needs express.json() to run before it, so req.body is available
+const emailOf = (req: Request): string =>
+  String(req.body?.email ?? "")
+    .trim()
+    .toLowerCase();
 
 export const generalAuthLimiter = createRateLimiter(
   AUTH_RATE_LIMITS.GENERAL.WINDOW_MS,
@@ -41,3 +47,30 @@ export const passwordResetLimiter = createRateLimiter(
   AUTH_RATE_LIMITS.PASSWORD_RESET.MAX_REQUESTS,
   "Too many password reset requests. Please try again later.",
 );
+
+// Per email: stops one inbox being flooded from many IPs
+export const otpEmailLimiter = rateLimit({
+  windowMs: AUTH_RATE_LIMITS.OTP_SEND.WINDOW_MS,
+  limit: AUTH_RATE_LIMITS.OTP_SEND.MAX_REQUESTS,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => emailOf(req) || ipKeyGenerator(req.ip ?? ""),
+  message: {
+    success: false,
+    message: "Too many OTP requests for this email. Please try again later.",
+  },
+});
+
+// Per IP + email, counts failed logins only
+export const loginFailureLimiter = rateLimit({
+  windowMs: AUTH_RATE_LIMITS.LOGIN_FAILED.WINDOW_MS,
+  limit: AUTH_RATE_LIMITS.LOGIN_FAILED.MAX_REQUESTS,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => `${ipKeyGenerator(req.ip ?? "")}:${emailOf(req)}`,
+  message: {
+    success: false,
+    message: "Too many failed login attempts. Please try again later.",
+  },
+});
