@@ -10,9 +10,8 @@ model User {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt   DateTime?     @map("deleted_at") @db.Timestamp(6)
-
+  refreshTokens RefreshToken[]
   authIdentities           AuthIdentity[]
-  otpCodes                 OtpCode[]
   patientProfile           PatientProfile?
   adminProfile             Admin?
   doctorProfile            DoctorProfile?    @relation("DoctorUser")
@@ -22,42 +21,11 @@ model User {
   messages                 Message[]
   notifications            Notification[]
   auditLogs                AuditLog[]
-
+termsAcceptedAt         DateTime? @map("terms_accepted_at") @db.Timestamp(6)
+privacyAcceptedAt       DateTime? @map("privacy_accepted_at") @db.Timestamp(6)
+healthConsentAcceptedAt DateTime? @map("health_consent_accepted_at") @db.Timestamp(6)
+consentVersion          String?   @map("consent_version") @db.VarChar(20)
   @@index([role, status])
   @@index([deletedAt])
   @@map("users")
-}
-
-model OtpCode {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String?   @map("user_id") @db.Uuid
-  email     String    @db.VarChar(255)
-  codeHash  String    @map("code_hash") @db.VarChar(255)
-  purpose   OtpPurpose
-  expiresAt DateTime  @map("expires_at") @db.Timestamp(6)
-  attempts  Int       @default(0)
-  usedAt    DateTime? @map("used_at") @db.Timestamp(6)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-
-  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([email, purpose, expiresAt])
-  @@index([userId])
-  @@map("otp_codes")
-}
-
-model AuthIdentity {
-  id           String      @id @default(uuid()) @db.Uuid
-  userId       String      @map("user_id") @db.Uuid
-  provider     AuthProvider
-  providerId   String      @map("provider_user_id") @db.VarChar(255)
-  passwordHash String?     @map("password_hash") @db.VarChar(255)
-  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamp(6)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerId])
-  @@unique([userId, provider])
-  @@map("auth_identities")
 }
