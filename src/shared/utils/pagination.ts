@@ -1,5 +1,5 @@
 
-import type { PaginationMeta } from "../types/api.js";
+import type { PaginationMeta } from "../../types/api.js";
 
 interface PaginationOptions {
   page?: number;
