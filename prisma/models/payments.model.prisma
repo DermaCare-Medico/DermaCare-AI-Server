@@ -1,0 +1,25 @@
+model PaymentTransaction {
+  id                    String            @id @default(uuid()) @db.Uuid
+  patientId             String            @map("patient_id") @db.Uuid
+  appointmentId         String?           @map("appointment_id") @db.Uuid
+  orderId               String?           @map("order_id") @db.Uuid
+  purpose               TransactionPurpose
+  amount                Decimal           @db.Decimal(10, 2)
+  currency              String            @default("BDT") @db.VarChar(3)
+  status                TransactionStatus @default(PENDING)
+  provider              String?           @db.VarChar(50)
+  providerTransactionId String?           @unique @map("provider_transaction_id") @db.VarChar(255)
+  paidAt                DateTime?         @map("paid_at") @db.Timestamp(6)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  appointment Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  order       Order?         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, createdAt])
+  @@index([appointmentId])
+  @@index([orderId])
+  @@index([status])
+  @@map("payment_transactions")
+}

@@ -1,0 +1,63 @@
+model User {
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String        @db.VarChar(150)
+  email       String        @unique @db.VarChar(255)
+  phone       String?       @unique @db.VarChar(30)
+  role        Role          @default(PATIENT)
+  status      AccountStatus @default(ACTIVE)
+  emailVerified Boolean     @default(false) @map("email_verified")
+  suspendedAt DateTime?     @map("suspended_at") @db.Timestamp(6)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime?     @map("deleted_at") @db.Timestamp(6)
+
+  authIdentities           AuthIdentity[]
+  otpCodes                 OtpCode[]
+  patientProfile           PatientProfile?
+  adminProfile             Admin?
+  doctorProfile            DoctorProfile?    @relation("DoctorUser")
+  approvedDoctors          DoctorProfile[]   @relation("DoctorApprover")
+  verifiedMedicines        Medicine[]        @relation("MedicineVerifier")
+  reviewedMedicineRequests MedicineRequest[]  @relation("MedicineRequestReviewer")
+  messages                 Message[]
+  notifications            Notification[]
+  auditLogs                AuditLog[]
+
+  @@index([role, status])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model OtpCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String?   @map("user_id") @db.Uuid
+  email     String    @db.VarChar(255)
+  codeHash  String    @map("code_hash") @db.VarChar(255)
+  purpose   OtpPurpose
+  expiresAt DateTime  @map("expires_at") @db.Timestamp(6)
+  attempts  Int       @default(0)
+  usedAt    DateTime? @map("used_at") @db.Timestamp(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, purpose, expiresAt])
+  @@index([userId])
+  @@map("otp_codes")
+}
+
+model AuthIdentity {
+  id           String      @id @default(uuid()) @db.Uuid
+  userId       String      @map("user_id") @db.Uuid
+  provider     AuthProvider
+  providerId   String      @map("provider_user_id") @db.VarChar(255)
+  passwordHash String?     @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@unique([userId, provider])
+  @@map("auth_identities")
+}
