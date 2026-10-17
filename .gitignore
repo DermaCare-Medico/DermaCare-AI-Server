@@ -9,4 +9,4 @@ Thumbs.db
 model/**/*.onnx
 model/**/*.pt
 model/**/*.safetensors
-
+src/generated
