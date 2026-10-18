@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import { env } from "../../config/env.js";
 import { AppError } from "../errors/AppError.js";
 import { AUTH_OTP } from "../constants/auth.constants.js";
+import { otpEmailTemplate } from "./email-templates/otp-email.template.js";
 
 const transporter = env.SMTP_HOST
   ? nodemailer.createTransport({
@@ -31,12 +32,20 @@ export const sendOtpEmail = async (
     return;
   }
 
-  const minutes = AUTH_OTP.TTL_MS / 60000;
-  await transporter.sendMail({
-    from: env.MAIL_FROM,
-    to,
-    subject: SUBJECTS[purpose],
-    text: `Your code is ${code}. It is valid for ${minutes} minutes. If you did not request it, ignore this email.`,
-    html: `<p>Your code is <strong style="font-size:20px;letter-spacing:4px">${code}</strong></p><p>It is valid for ${minutes} minutes. If you did not request it, ignore this email.</p>`,
-  });
-};
+  
+const minutes = AUTH_OTP.TTL_MS / 60000;
+
+await transporter.sendMail({
+  from: env.MAIL_FROM,
+  to,
+  subject: SUBJECTS[purpose],
+
+  text: `Your code is ${code}. It is valid for ${minutes} minutes. If you did not request it, ignore this email.`,
+
+  html: otpEmailTemplate({
+    code,
+    purpose,
+    expiresInMinutes: minutes,
+  }),
+});
+}
