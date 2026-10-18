@@ -3,9 +3,6 @@ export * from "./services/login.service.js";
 export * from "./services/password-reset.service.js";
 export * from "./services/session.service.js";
 export * from "./services/account.service.js";
-export * from "./services/google.service.js";
-export * from "./services/otp.service.js";
-export * from "./services/password.service.js";
 
 
 
