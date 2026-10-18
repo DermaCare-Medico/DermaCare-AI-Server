@@ -6,12 +6,12 @@ import {
   registerRequestSchema,
   verifyOtpSchema,
 } from "../auth.validation.js";
-import { registrationService } from "../auth.service.js";
+import { authService } from "../auth.service.js";
 
 export const registrationController = {
   requestOtp: asyncHandler(async (req, res) => {
     const body = parse(registerRequestSchema, req.body);
-    const data = await registrationService.requestRegistrationOtp(body);
+    const data = await authService.registration.requestRegistrationOtp(body);
     res.status(200).json({
       success: true,
       message: "A verification code was sent to your email",
@@ -21,7 +21,7 @@ export const registrationController = {
 
   resendOtp: asyncHandler(async (req, res) => {
     const { email } = parse(emailOnlySchema, req.body);
-    const data = await registrationService.resendRegistrationOtp(email);
+    const data = await authService.registration.resendRegistrationOtp(email);
     res.status(200).json({
       success: true,
       message: "A new code was sent to your email",
@@ -31,7 +31,7 @@ export const registrationController = {
 
   verifyOtp: asyncHandler(async (req, res) => {
     const body = parse(verifyOtpSchema, req.body);
-    const data = await registrationService.verifyRegistration(body, metaOf(req));
+    const data = await authService.registration.verifyRegistration(body, metaOf(req));
     res.status(201).json({ success: true, message: "Account created", data });
   }),
 };
