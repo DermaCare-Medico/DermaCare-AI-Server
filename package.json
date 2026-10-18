@@ -5,16 +5,15 @@
   "description": "DermaCare AI — Premium Swagger / OpenAPI 3.0 Documentation Portal",
   "main": "dist/server.js",
   "scripts": {
-    "validate": "tsx src/validate-spec.ts",
-    "export": "tsx src/docs/export-spec.ts",
-    "build": "tsc && tsx src/docs/export-spec.ts",
-    "start": "node dist/server.js",
-    "dev": "tsx src/server.ts",
-    "typecheck": "tsc --noEmit",
-    "prisma:validate": "prisma validate",
-    "prisma:generate": "prisma generate",
-    "test": "tsx src/validate-spec.ts"
-  },
+  "dev": "tsx watch src/server.ts",
+  "build": "tsc",
+  "start": "node dist/server.js",
+  "typecheck": "tsc --noEmit",
+  "db:generate": "prisma generate",
+  "db:migrate": "prisma migrate dev",
+  "db:deploy": "prisma migrate deploy",
+  "db:studio": "prisma studio"
+},
   "keywords": [
     "dermacare",
     "openapi",

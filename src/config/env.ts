@@ -29,6 +29,9 @@ const envSchema = z
     SMTP_USER: optionalString,
     SMTP_PASS: optionalString,
     MAIL_FROM: optionalString,
+
+       // CORS
+    CORS_ORIGIN: z.string().default("http://localhost:3000"),
   })
   .superRefine((values, ctx) => {
     if (values.SMTP_HOST && !values.MAIL_FROM) {
@@ -55,5 +58,7 @@ if (!result.success) {
   console.error(result.error.flatten().fieldErrors);
   throw new Error("Environment validation failed");
 }
+
+
 
 export const env = result.data;
