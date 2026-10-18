@@ -12,7 +12,9 @@ const envSchema = z
     NODE_ENV: z
       .enum(["development", "production", "test"])
       .default("development"),
-
+    // Server
+      PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+      
     // JWT
     JWT_ACCESS_SECRET: z.string().min(96),
     JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
@@ -32,6 +34,9 @@ const envSchema = z
 
        // CORS
     CORS_ORIGIN: z.string().default("http://localhost:3000"),
+
+    // trust proxy (for reverse proxies like Nginx)
+    TRUST_PROXY: z.coerce.number().int().nonnegative().default(0),
   })
   .superRefine((values, ctx) => {
     if (values.SMTP_HOST && !values.MAIL_FROM) {
