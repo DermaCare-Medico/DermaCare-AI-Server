@@ -7,6 +7,7 @@ import { Prisma } from "../../../generated/prisma/client.js";
 import type { Role } from "../../../generated/prisma/client.js";
 import type { RegisterPayload, RegisterRole, RequestMeta } from "../../../types/auth.types.js";
 import { otpService } from "./otp.service.js";
+import { issueSession } from "./token.service.js";
 
 export const userSelect = {
   id: true,
@@ -65,9 +66,7 @@ export const startSession = async (user: DbUser, meta: RequestMeta) => {
   assertActive(user);
 
   const [tokens, doctorStatus] = await Promise.all([
-    import("./token.service.js").then(({ issueSession }) =>
-      issueSession(user, meta),
-    ),
+    issueSession(user, meta),
     doctorStatusOf(user),
   ]);
 
