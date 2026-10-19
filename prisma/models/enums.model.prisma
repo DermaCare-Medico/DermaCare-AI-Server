@@ -1,0 +1,167 @@
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+  STORE_OWNER
+
+  @@map("user_role")
+}
+
+enum AccountStatus {
+  ACTIVE
+  PENDING
+  REJECTED
+  SUSPENDED
+
+  @@map("account_status")
+}
+
+enum AuthProvider {
+  PASSWORD
+  GOOGLE
+
+  @@map("auth_provider")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+
+  @@map("gender")
+}
+
+enum OtpPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+
+  @@map("otp_purpose")
+}
+
+enum RiskCategory {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+
+  @@map("risk_category")
+}
+
+enum DoctorApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("doctor_approval_status")
+}
+
+enum SlotStatus {
+  AVAILABLE
+  HELD
+  BOOKED
+  UNAVAILABLE
+
+  @@map("slot_status")
+}
+
+enum AppointmentStatus {
+  HELD
+  CONFIRMED
+  CANCELLATION_REQUESTED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  PENDING
+
+  @@map("appointment_status")
+}
+
+enum ScreeningStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+
+  @@map("screening_status")
+}
+
+enum ImageQualityStatus {
+  GOOD
+  POOR
+  UNUSABLE
+
+  @@map("image_quality_status")
+}
+
+enum ImageType {
+  FRONT
+  LEFT
+  RIGHT
+  OTHER
+
+  @@map("image_type")
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+
+  @@map("conversation_status")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+
+  @@map("order_status")
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+
+  @@map("payout_status")
+}
+
+enum TransactionStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+
+  @@map("transaction_status")
+}
+
+enum TransactionPurpose {
+  APPOINTMENT
+  MEDICINE_ORDER
+
+  @@map("transaction_purpose")
+}
+
+enum MedicineRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("medicine_request_status")
+}
+
+enum NotificationType {
+  APPOINTMENT
+  PRESCRIPTION
+  MESSAGE
+  ORDER
+  PAYMENT
+  ACCOUNT
+  SYSTEM
+
+  @@map("notification_type")
+}
