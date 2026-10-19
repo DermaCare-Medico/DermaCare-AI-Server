@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { medicationController } from "./controllers/medication.controller.js";
 import { patientController } from "./controllers/patient.controller.js";
-import { validateUpdatePatientProfile } from "./patients.validation.js";
+import {
+    validateCreateMedication,
+    validateUpdatePatientProfile,
+} from "./patients.validation.js";
 
 const patientRouter = Router();
 
@@ -18,5 +22,10 @@ patientRouter.patch(
 patientRouter.get(
     "/patients/me/dashboard",
     asyncHandler(patientController.getMyDashboardController),
+);
+patientRouter.post(
+    "/patients/me/medications",
+    validateCreateMedication,
+    asyncHandler(medicationController.createMyMedicationController),
 );
 export default patientRouter;

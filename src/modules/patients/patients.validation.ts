@@ -23,6 +23,35 @@ const updatePatientProfileSchema = z.object({
     existingConditions: z.array(z.string()).optional(),
 }).strict();
 
+const medicationDateSchema = z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must use YYYY-MM-DD format")
+    .refine((value: string) => {
+        const date = new Date(`${value}T00:00:00.000Z`);
+        return !Number.isNaN(date.getTime())
+            && date.toISOString().slice(0, 10) === value;
+    }, "Date must be valid");
+
+const createMedicationSchema = z.object({
+    medicineName: z.string().trim().min(1).max(200),
+    dosage: z.string().trim().min(1).max(100).nullable().optional(),
+    frequency: z.string().trim().min(1).max(100).nullable().optional(),
+    startDate: medicationDateSchema.nullable().optional(),
+    endDate: medicationDateSchema.nullable().optional(),
+    notes: z.string().trim().min(1).nullable().optional(),
+}).strict().refine(
+    (value) => !value.startDate || !value.endDate || value.endDate >= value.startDate,
+    {
+        path: ["endDate"],
+        message: "endDate cannot be before startDate",
+    },
+);
+
+export type CreateMedicationInput = z.infer<typeof createMedicationSchema>;
+
 export const validateUpdatePatientProfile = validateRequest({
     body: updatePatientProfileSchema,
+});
+
+export const validateCreateMedication = validateRequest({
+    body: createMedicationSchema,
 });
