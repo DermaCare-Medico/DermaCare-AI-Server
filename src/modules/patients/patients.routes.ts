@@ -4,6 +4,7 @@ import { medicationController } from "./controllers/medication.controller.js";
 import { patientController } from "./controllers/patient.controller.js";
 import {
     validateCreateMedication,
+    validateUpdateMedication,
     validateUpdatePatientProfile,
 } from "./patients.validation.js";
 
@@ -27,5 +28,10 @@ patientRouter.post(
     "/patients/me/medications",
     validateCreateMedication,
     asyncHandler(medicationController.createMyMedicationController),
+);
+patientRouter.patch(
+    "/patients/me/medications/:id",
+    validateUpdateMedication,
+    asyncHandler(medicationController.updateMyMedicationController),
 );
 export default patientRouter;

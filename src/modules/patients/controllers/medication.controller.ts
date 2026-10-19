@@ -26,6 +26,22 @@ const createMyMedicationController = async (req: Request, res: Response) => {
     });
 };
 
+const updateMyMedicationController = async (req: Request, res: Response) => {
+    const medication = await medicationService.updateMyMedication(
+        getUserId(req),
+        req.params.id!,
+        req.body,
+    );
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Medication updated successfully",
+        data: medication,
+    });
+};
+
 export const medicationController = {
     createMyMedicationController,
+    updateMyMedicationController,
 };
