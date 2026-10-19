@@ -8,22 +8,38 @@ import { sendCode, otpInfo } from "./auth.helpers.js";
 
 export const passwordResetService = {
   // Always answers the same, so it cannot be used to find registered emails
-  async requestPasswordResetOtp(email: string) {
-    const user = await prisma.user.findUnique({
-      where: { email },
-      select: { deletedAt: true },
-    });
 
-    if (user && !user.deletedAt) {
-      try {
-        await sendCode(email, "PASSWORD_RESET");
-      } catch (e) {
-        if (!(e instanceof AppError && e.statusCode === 429)) throw e;
+async requestPasswordResetOtp(email: string) {
+
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { deletedAt: true },
+  });
+
+  if (user && !user.deletedAt) {
+    try {
+
+     await sendCode(email, "PASSWORD_RESET");
+
+    } catch (error) {
+      console.error("[Password Reset] sendCode failed", error);
+
+      if (
+        !(
+          error instanceof AppError &&
+          error.statusCode === 429
+        )
+      ) {
+        throw error;
       }
     }
+  }
 
-    return otpInfo;
-  },
+
+  return otpInfo;
+},
+
 
   // Checks the code without using it (step 2 of the screen)
   async checkPasswordResetOtp(input: { email: string; otp: string }) {
