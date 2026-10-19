@@ -5,12 +5,8 @@ import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { appointmentService } from "../services/appointment.service.js";
 
-type AuthenticatedRequest = Request & {
-    user?: { userId?: string; role?: string };
-};
-
 const getUserId = (req: Request) => {
-    const userId = (req as AuthenticatedRequest).user?.userId;
+    const userId = req.auth?.userId;
     if (!userId) {
         throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
     }
