@@ -1,0 +1,12 @@
+warning: in the working copy of 'openapi.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'openapi.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'prisma/schema.prisma', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/modules/appointments/appointments.routes.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/modules/appointments/appointments.validation.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/modules/appointments/controllers/appointment.controller.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/modules/appointments/services/appointment.service.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/modules/patients/controllers/patient.controller.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/modules/patients/patients.validation.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/public/inventory.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/public/openapi.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/public/openapi.yaml', LF will be replaced by CRLF the next time Git touches it
