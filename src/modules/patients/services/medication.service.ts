@@ -134,7 +134,34 @@ const updateMyMedication = async (
     });
 };
 
+const deactivateMyMedication = async (
+    userId: string,
+    medicationId: string,
+) => {
+    const patient = await getActivePatientProfile(userId);
+    const result = await prisma.currentMedication.updateMany({
+        where: {
+            id: medicationId,
+            patientId: patient.id,
+            isActive: true,
+        },
+        data: {
+            isActive: false,
+        },
+    });
+
+    if (result.count !== 1) {
+        throw new AppError("Medication not found", HTTP_STATUS.NOT_FOUND);
+    }
+
+    return {
+        id: medicationId,
+        isActive: false,
+    };
+};
+
 export const medicationService = {
     createMyMedication,
     updateMyMedication,
+    deactivateMyMedication,
 };

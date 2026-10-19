@@ -4,6 +4,7 @@ import { medicationController } from "./controllers/medication.controller.js";
 import { patientController } from "./controllers/patient.controller.js";
 import {
     validateCreateMedication,
+    validateMedicationId,
     validateUpdateMedication,
     validateUpdatePatientProfile,
 } from "./patients.validation.js";
@@ -33,5 +34,10 @@ patientRouter.patch(
     "/patients/me/medications/:id",
     validateUpdateMedication,
     asyncHandler(medicationController.updateMyMedicationController),
+);
+patientRouter.delete(
+    "/patients/me/medications/:id",
+    validateMedicationId,
+    asyncHandler(medicationController.deactivateMyMedicationController),
 );
 export default patientRouter;

@@ -85,3 +85,7 @@ export const validateUpdateMedication = validateRequest({
     params: medicationIdParamsSchema,
     body: updateMedicationSchema,
 });
+
+export const validateMedicationId = validateRequest({
+    params: medicationIdParamsSchema,
+});

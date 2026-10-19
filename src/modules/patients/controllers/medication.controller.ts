@@ -41,7 +41,22 @@ const updateMyMedicationController = async (req: Request, res: Response) => {
     });
 };
 
+const deactivateMyMedicationController = async (req: Request, res: Response) => {
+    const medication = await medicationService.deactivateMyMedication(
+        getUserId(req),
+        req.params.id!,
+    );
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Medication deleted successfully",
+        data: medication,
+    });
+};
+
 export const medicationController = {
     createMyMedicationController,
     updateMyMedicationController,
+    deactivateMyMedicationController,
 };
