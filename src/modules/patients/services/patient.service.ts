@@ -1,12 +1,34 @@
 
 import { prisma } from "../../../lib/prisma.js";
+import { AccountStatus, Role } from "../../../generated/prisma/client.js";
 import { UpdatePatientProfilePayload } from "../../../types/patients.types.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 
+const ensureActivePatient = async (userId: string) => {
+    const user = await prisma.user.findFirst({
+        where: {
+            id: userId,
+            role: Role.PATIENT,
+            status: AccountStatus.ACTIVE,
+            deletedAt: null,
+        },
+        select: { id: true },
+    });
+
+    if (!user) {
+        throw new AppError(
+            "Only active patients may access patient profiles",
+            HTTP_STATUS.FORBIDDEN,
+        );
+    }
+};
+
 
 //patient profile get api
 const getMyProfile = async (userId: string) => {
+    await ensureActivePatient(userId);
+
     const patient = await prisma.patientProfile.findUnique({
         where: {
             userId,
@@ -47,6 +69,8 @@ export const updateMyProfile = async (
     userId: string,
     payload: UpdatePatientProfilePayload
 ) => {
+    await ensureActivePatient(userId);
+
     // Find the logged-in patient's profile
     const patient = await prisma.patientProfile.findUnique({
         where: {
