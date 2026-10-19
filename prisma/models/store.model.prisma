@@ -1,18 +1,16 @@
 model Medicine {
-  id                   String    @id @default(uuid()) @db.Uuid
-  name                 String    @db.VarChar(200)
-  verifiedById         String?   @map("verified_by") @db.Uuid
+  id                   String             @id @default(uuid()) @db.Uuid
+  name                 String             @db.VarChar(200)
+  verifiedById         String?            @map("verified_by") @db.Uuid
   description          String?
-  requiresPrescription Boolean   @default(false) @map("requires_prescription")
-  isVerified           Boolean   @default(false) @map("is_verified")
-  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-  verifiedAt           DateTime? @map("verified_at") @db.Timestamp(6)
-  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
-
-  verifiedBy User? @relation("MedicineVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
-
-  inventory         StoreInventory[]
-  prescriptionItems PrescriptionItem[]
+  requiresPrescription Boolean            @default(false) @map("requires_prescription")
+  isVerified           Boolean            @default(false) @map("is_verified")
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamp(6)
+  verifiedAt           DateTime?          @map("verified_at") @db.Timestamp(6)
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamp(6)
+  verifiedBy           User?              @relation("MedicineVerifier", fields: [verifiedById], references: [id])
+  prescriptionItems    PrescriptionItem[]
+  inventory            StoreInventory?
 
   @@index([name])
   @@index([isVerified])
@@ -20,23 +18,22 @@ model Medicine {
 }
 
 model MedicineRequest {
-  id              String               @id @default(uuid()) @db.Uuid
-  requestedById   String               @map("requested_by") @db.Uuid
-  medicineName    String               @map("medicine_name") @db.VarChar(255)
-  genericName     String?              @map("generic_name") @db.VarChar(255)
-  strength        String?              @db.VarChar(100)
-  dosageForm      String?              @map("dosage_form") @db.VarChar(100)
-  manufacturer    String?              @db.VarChar(255)
+  id              String                @id @default(uuid()) @db.Uuid
+  requestedById   String                @map("requested_by") @db.Uuid
+  medicineName    String                @map("medicine_name") @db.VarChar(255)
+  genericName     String?               @map("generic_name") @db.VarChar(255)
+  strength        String?               @db.VarChar(100)
+  dosageForm      String?               @map("dosage_form") @db.VarChar(100)
+  manufacturer    String?               @db.VarChar(255)
   description     String?
   status          MedicineRequestStatus @default(PENDING)
-  reviewedById    String?              @map("reviewed_by") @db.Uuid
-  reviewedAt      DateTime?            @map("reviewed_at") @db.Timestamp(6)
-  rejectionReason String?              @map("rejection_reason")
-  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamp(6)
-
-  requestedBy DoctorProfile @relation(fields: [requestedById], references: [id], onDelete: Restrict)
-  reviewedBy  User?         @relation("MedicineRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedById    String?               @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime?             @map("reviewed_at") @db.Timestamp(6)
+  rejectionReason String?               @map("rejection_reason")
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamp(6)
+  requestedBy     DoctorProfile         @relation(fields: [requestedById], references: [id])
+  reviewedBy      User?                 @relation("MedicineRequestReviewer", fields: [reviewedById], references: [id])
 
   @@index([status])
   @@index([requestedById])
@@ -44,15 +41,14 @@ model MedicineRequest {
 }
 
 model StoreInventory {
-  id            String   @id @default(uuid()) @db.Uuid
-  medicineId    String   @unique @map("medicine_id") @db.Uuid
-  price         Decimal  @db.Decimal(10, 2)
-  stockQuantity Int      @default(0) @map("stock_quantity")
-  isAvailable   Boolean  @default(true) @map("is_available")
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
-
-  medicine   Medicine    @relation(fields: [medicineId], references: [id], onDelete: Restrict)
-  orderItems OrderItem[]
+  id            String      @id @default(uuid()) @db.Uuid
+  medicineId    String      @unique @map("medicine_id") @db.Uuid
+  price         Decimal     @db.Decimal(10, 2)
+  stockQuantity Int         @default(0) @map("stock_quantity")
+  isAvailable   Boolean     @default(true) @map("is_available")
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamp(6)
+  orderItems    OrderItem[]
+  medicine      Medicine    @relation(fields: [medicineId], references: [id])
 
   @@map("store_inventory")
 }

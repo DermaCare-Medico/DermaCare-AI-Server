@@ -1,18 +1,16 @@
 model Order {
-  id              String      @id @default(uuid()) @db.Uuid
-  patientId       String      @map("patient_id") @db.Uuid
-  prescriptionId  String?     @map("prescription_id") @db.Uuid
-  status          OrderStatus @default(PENDING)
-  totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
-  deliveryAddress String      @map("delivery_address")
-  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamp(6)
-
-  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  prescription Prescription? @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
-
-  items    OrderItem[]
-  payments PaymentTransaction[]
+  id              String               @id @default(uuid()) @db.Uuid
+  patientId       String               @map("patient_id") @db.Uuid
+  prescriptionId  String?              @map("prescription_id") @db.Uuid
+  status          OrderStatus          @default(PENDING)
+  totalAmount     Decimal              @map("total_amount") @db.Decimal(10, 2)
+  deliveryAddress String               @map("delivery_address")
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamp(6)
+  items           OrderItem[]
+  patient         PatientProfile       @relation(fields: [patientId], references: [id])
+  prescription    Prescription?        @relation(fields: [prescriptionId], references: [id])
+  payments        PaymentTransaction[]
 
   @@index([patientId, createdAt])
   @@index([status])
@@ -21,16 +19,15 @@ model Order {
 }
 
 model OrderItem {
-  id           String  @id @default(uuid()) @db.Uuid
-  orderId      String  @map("order_id") @db.Uuid
-  inventoryId  String  @map("inventory_id") @db.Uuid
-  medicineName String  @map("medicine_name") @db.VarChar(200)
+  id           String         @id @default(uuid()) @db.Uuid
+  orderId      String         @map("order_id") @db.Uuid
+  inventoryId  String         @map("inventory_id") @db.Uuid
+  medicineName String         @map("medicine_name") @db.VarChar(200)
   quantity     Int
-  unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
-  subtotal     Decimal @db.Decimal(10, 2)
-
-  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  inventory StoreInventory @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+  unitPrice    Decimal        @map("unit_price") @db.Decimal(10, 2)
+  subtotal     Decimal        @db.Decimal(10, 2)
+  inventory    StoreInventory @relation(fields: [inventoryId], references: [id])
+  order        Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([inventoryId])
