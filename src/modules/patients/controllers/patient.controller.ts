@@ -37,7 +37,19 @@ const updateMyProfileController = async (req: Request, res: Response) => {
     });
 };
 
+const getMyDashboardController = async (req: Request, res: Response) => {
+    const dashboard = await patientService.getMyDashboard(getUserId(req));
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Patient dashboard retrieved successfully",
+        data: dashboard,
+    });
+};
+
 export const patientController = {
     getMyProfileController,
     updateMyProfileController,
+    getMyDashboardController,
 };

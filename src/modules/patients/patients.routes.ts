@@ -15,4 +15,8 @@ patientRouter.patch(
     validateUpdatePatientProfile,
     asyncHandler(patientController.updateMyProfileController),
 );
+patientRouter.get(
+    "/patients/me/dashboard",
+    asyncHandler(patientController.getMyDashboardController),
+);
 export default patientRouter;
