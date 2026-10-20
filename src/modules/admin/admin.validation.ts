@@ -105,6 +105,17 @@ const doctorListQuerySchema = z.object({
     status: z.enum(DoctorApprovalStatus).optional(),
 }).strict();
 
+const doctorIdParamsSchema = z.object({ id: uuidSchema }).strict();
+
+const doctorApprovalListQuerySchema = z.object({
+    ...paginationShape,
+}).strict();
+
+const approveDoctorBodySchema = z.preprocess(
+    (value) => value ?? {},
+    z.object({}).strict(),
+);
+
 export const validateAdminPayoutList = validateRequest({ query: payoutListQuerySchema });
 export const validateAdminPayoutId = validateRequest({ params: payoutIdParamsSchema });
 export const validateAdminOrderList = validateRequest({ query: orderListQuerySchema });
@@ -120,3 +131,11 @@ export const validateAdminUserStatus = validateRequest({
     body: userStatusSchema,
 });
 export const validateAdminDoctorList = validateRequest({ query: doctorListQuerySchema });
+export const validateAdminDoctorId = validateRequest({ params: doctorIdParamsSchema });
+export const validateAdminDoctorApprovalList = validateRequest({
+    query: doctorApprovalListQuerySchema,
+});
+export const validateAdminDoctorApproval = validateRequest({
+    params: doctorIdParamsSchema,
+    body: approveDoctorBodySchema,
+});

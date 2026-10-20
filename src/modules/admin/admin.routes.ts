@@ -4,12 +4,16 @@ import { asyncHandler } from "../../middlewares/asyncHandler.js";
 import { dashboardController } from "./controllers/dashboard.controller.js";
 import { doctorPayoutAdminController } from "./controllers/doctor-payout-admin.controller.js";
 import { userManagementController } from "./controllers/user-management.controller.js";
+import { doctorVerificationController } from "./controllers/doctor-verification.controller.js";
 import { orderController } from "../orders/controllers/order.controller.js";
 import {
     validateAdminOrderList,
     validateAdminOrderId,
     validateAdminOrderStatus,
     validateAdminDoctorList,
+    validateAdminDoctorId,
+    validateAdminDoctorApproval,
+    validateAdminDoctorApprovalList,
     validateAdminPayoutId,
     validateAdminPayoutList,
     validateAdminUserList,
@@ -68,6 +72,21 @@ adminRouter.get(
     "/doctors",
     validateAdminDoctorList,
     asyncHandler(userManagementController.listDoctors),
+);
+adminRouter.get(
+    "/doctors/:id",
+    validateAdminDoctorId,
+    asyncHandler(doctorVerificationController.getDoctor),
+);
+adminRouter.get(
+    "/doctor-approvals",
+    validateAdminDoctorApprovalList,
+    asyncHandler(doctorVerificationController.listPendingApprovals),
+);
+adminRouter.post(
+    "/doctor-approvals/:id/approve",
+    validateAdminDoctorApproval,
+    asyncHandler(doctorVerificationController.approveDoctor),
 );
 
 export default adminRouter;
