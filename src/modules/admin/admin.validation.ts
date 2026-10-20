@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
     AccountStatus,
+    DoctorApprovalStatus,
     OrderStatus,
     PayoutStatus,
     Role,
@@ -32,6 +33,18 @@ export type AdminUserListQuery = {
 export type AdminOrderStatusInput = {
     status: OrderStatus;
     reason?: string;
+};
+
+export type AdminUserStatusInput = {
+    status: "ACTIVE" | "SUSPENDED";
+};
+
+export type AdminDoctorListQuery = {
+    page: number;
+    limit: number;
+    search?: string;
+    specialization?: string;
+    status?: DoctorApprovalStatus;
 };
 
 const paginationShape = {
@@ -79,6 +92,19 @@ const userListQuerySchema = z.object({
     status: z.enum(AccountStatus).optional(),
 }).strict();
 
+const userIdParamsSchema = z.object({ id: uuidSchema }).strict();
+
+const userStatusSchema = z.object({
+    status: z.enum([AccountStatus.ACTIVE, AccountStatus.SUSPENDED]),
+}).strict();
+
+const doctorListQuerySchema = z.object({
+    ...paginationShape,
+    search: z.string().trim().min(1).max(150).optional(),
+    specialization: z.string().trim().min(1).max(150).optional(),
+    status: z.enum(DoctorApprovalStatus).optional(),
+}).strict();
+
 export const validateAdminPayoutList = validateRequest({ query: payoutListQuerySchema });
 export const validateAdminPayoutId = validateRequest({ params: payoutIdParamsSchema });
 export const validateAdminOrderList = validateRequest({ query: orderListQuerySchema });
@@ -88,3 +114,9 @@ export const validateAdminOrderStatus = validateRequest({
     body: orderStatusSchema,
 });
 export const validateAdminUserList = validateRequest({ query: userListQuerySchema });
+export const validateAdminUserId = validateRequest({ params: userIdParamsSchema });
+export const validateAdminUserStatus = validateRequest({
+    params: userIdParamsSchema,
+    body: userStatusSchema,
+});
+export const validateAdminDoctorList = validateRequest({ query: doctorListQuerySchema });

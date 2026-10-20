@@ -9,9 +9,12 @@ import {
     validateAdminOrderList,
     validateAdminOrderId,
     validateAdminOrderStatus,
+    validateAdminDoctorList,
     validateAdminPayoutId,
     validateAdminPayoutList,
     validateAdminUserList,
+    validateAdminUserId,
+    validateAdminUserStatus,
 } from "./admin.validation.js";
 
 const adminRouter = Router();
@@ -50,6 +53,21 @@ adminRouter.get(
     "/users",
     validateAdminUserList,
     asyncHandler(userManagementController.listUsers),
+);
+adminRouter.get(
+    "/users/:id",
+    validateAdminUserId,
+    asyncHandler(userManagementController.getUser),
+);
+adminRouter.patch(
+    "/users/:id/status",
+    validateAdminUserStatus,
+    asyncHandler(userManagementController.updateUserStatus),
+);
+adminRouter.get(
+    "/doctors",
+    validateAdminDoctorList,
+    asyncHandler(userManagementController.listDoctors),
 );
 
 export default adminRouter;
