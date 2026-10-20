@@ -1,6 +1,7 @@
 model Medicine {
   id                   String    @id @default(uuid()) @db.Uuid
   name                 String    @db.VarChar(200)
+  strength             String?   @db.VarChar(100)
   verifiedById         String?   @map("verified_by") @db.Uuid
   description          String?
   requiresPrescription Boolean   @default(false) @map("requires_prescription")

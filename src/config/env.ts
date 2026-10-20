@@ -14,6 +14,9 @@ const envSchema = z
       .default("development"),
     // Server
       PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+
+    // Store
+      LOW_STOCK_THRESHOLD: z.coerce.number().int().nonnegative().default(10),
       
     // JWT
     JWT_ACCESS_SECRET: z.string().min(96),

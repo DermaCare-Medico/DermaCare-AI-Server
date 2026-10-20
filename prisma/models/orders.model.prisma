@@ -27,6 +27,7 @@ model OrderItem {
   orderId      String  @map("order_id") @db.Uuid
   inventoryId  String  @map("inventory_id") @db.Uuid
   medicineName String  @map("medicine_name") @db.VarChar(200)
+  medicineStrength String? @map("medicine_strength") @db.VarChar(100)
   quantity     Int
   unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
   subtotal     Decimal @db.Decimal(10, 2)

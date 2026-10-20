@@ -8,12 +8,14 @@ import type {
 import { requireActiveAdmin } from "../../admin/services/admin.service.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import type { PublicMedicineListQuery } from "../stores.validation.js";
+import { env } from "../../../config/env.js";
 
-const LOW_STOCK_MAXIMUM = 10;
+const LOW_STOCK_MAXIMUM = env.LOW_STOCK_THRESHOLD;
 
 const medicineSelect = {
     id: true,
     name: true,
+    strength: true,
     description: true,
     requiresPrescription: true,
     isVerified: true,
@@ -34,6 +36,7 @@ const medicineSelect = {
 const publicMedicineSelect = {
     id: true,
     name: true,
+    strength: true,
     description: true,
     requiresPrescription: true,
     inventory: {
@@ -50,6 +53,7 @@ type PublicMedicineRecord = Prisma.MedicineGetPayload<{
 const presentPublicMedicine = (medicine: PublicMedicineRecord) => ({
     id: medicine.id,
     name: medicine.name,
+    strength: medicine.strength,
     description: medicine.description,
     requiresPrescription: medicine.requiresPrescription,
     price: medicine.inventory[0]!.price,
@@ -62,6 +66,7 @@ const publicMedicineWhere = (search?: string): Prisma.MedicineWhereInput => ({
     ...(search && {
         OR: [
             { name: { contains: search, mode: "insensitive" } },
+            { strength: { contains: search, mode: "insensitive" } },
             { description: { contains: search, mode: "insensitive" } },
         ],
     }),
@@ -109,6 +114,7 @@ const listMedicinesForAdmin = async (
         ...(query.search && {
             OR: [
                 { name: { contains: query.search, mode: "insensitive" } },
+                { strength: { contains: query.search, mode: "insensitive" } },
                 { description: { contains: query.search, mode: "insensitive" } },
             ],
         }),
@@ -154,6 +160,7 @@ const createMedicineForAdmin = async (adminUserId: string, input: CreateMedicine
         const medicine = await tx.medicine.create({
             data: {
                 name: input.name,
+                strength: input.strength,
                 description: input.description,
                 requiresPrescription: input.requiresPrescription,
                 isVerified: true,
@@ -178,6 +185,7 @@ const createMedicineForAdmin = async (adminUserId: string, input: CreateMedicine
                 entityId: medicine.id,
                 after: {
                     name: input.name,
+                    strength: input.strength,
                     price: input.price,
                     stockQuantity: input.stockQuantity,
                     requiresPrescription: input.requiresPrescription,
@@ -210,6 +218,7 @@ const updateMedicineForAdmin = async (
             where: { id: medicineId },
             select: {
                 name: true,
+                strength: true,
                 description: true,
                 requiresPrescription: true,
                 inventory: {
@@ -234,6 +243,7 @@ const updateMedicineForAdmin = async (
 
         if (
             input.name !== undefined
+            || input.strength !== undefined
             || input.description !== undefined
             || input.requiresPrescription !== undefined
         ) {
@@ -241,6 +251,7 @@ const updateMedicineForAdmin = async (
                 where: { id: medicineId },
                 data: {
                     ...(input.name !== undefined && { name: input.name }),
+                    ...(input.strength !== undefined && { strength: input.strength }),
                     ...(input.description !== undefined && { description: input.description }),
                     ...(input.requiresPrescription !== undefined && {
                         requiresPrescription: input.requiresPrescription,
@@ -273,6 +284,7 @@ const updateMedicineForAdmin = async (
                 entityId: medicineId,
                 before: {
                     name: existing.name,
+                    strength: existing.strength,
                     description: existing.description,
                     requiresPrescription: existing.requiresPrescription,
                     price: inventory?.price.toString() ?? null,

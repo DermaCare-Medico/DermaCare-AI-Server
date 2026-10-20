@@ -19,6 +19,7 @@ import {
     aggregateInventoryQuantities,
     getOrderPaymentExpiry,
 } from "./order-payment.rules.js";
+import { getAllowedOrderTransitions } from "./order-status.rules.js";
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -55,6 +56,7 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                     medicine: {
                         select: {
                             name: true,
+                            strength: true,
                             requiresPrescription: true,
                         },
                     },
@@ -104,6 +106,7 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                 return {
                     inventoryId: inventory.id,
                     medicineName: inventory.medicine.name,
+                    medicineStrength: inventory.medicine.strength,
                     quantity: item.quantity,
                     unitPrice: inventory.price,
                     subtotal: inventory.price.mul(item.quantity),
@@ -151,6 +154,7 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                         select: {
                             id: true,
                             medicineName: true,
+                            medicineStrength: true,
                             quantity: true,
                             unitPrice: true,
                             subtotal: true,
@@ -222,6 +226,7 @@ const getMyOrder = async (userId: string, orderId: string) => {
                 select: {
                     id: true,
                     medicineName: true,
+                    medicineStrength: true,
                     quantity: true,
                     unitPrice: true,
                     subtotal: true,
@@ -294,6 +299,7 @@ const orderDetailsSelect = {
         select: {
             id: true,
             medicineName: true,
+            medicineStrength: true,
             quantity: true,
             unitPrice: true,
             subtotal: true,
@@ -323,15 +329,6 @@ const getOrderForAdmin = async (adminUserId: string, orderId: string) => {
     return order;
 };
 
-const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
-    [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-    [OrderStatus.CONFIRMED]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
-    [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
-    [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED],
-    [OrderStatus.DELIVERED]: [],
-    [OrderStatus.CANCELLED]: [],
-};
-
 const updateOrderStatusForAdmin = async (
     adminUserId: string,
     orderId: string,
@@ -357,7 +354,7 @@ const updateOrderStatusForAdmin = async (
             },
         });
         if (!existing) throw new AppError("Order not found", 404);
-        if (!allowedTransitions[existing.status].includes(input.status)) {
+        if (!getAllowedOrderTransitions(existing.status).includes(input.status)) {
             throw new AppError(
                 `Order cannot transition from ${existing.status} to ${input.status}`,
                 409,

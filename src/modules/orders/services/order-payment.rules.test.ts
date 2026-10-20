@@ -8,6 +8,8 @@ import {
     isMatchingOrderPayment,
     ORDER_PAYMENT_WINDOW_MS,
 } from "./order-payment.rules.js";
+import { OrderStatus } from "../../../generated/prisma/enums.js";
+import { getAllowedOrderTransitions } from "./order-status.rules.js";
 
 test("order payment expires exactly 30 minutes after creation", () => {
     const createdAt = new Date("2026-10-20T00:00:00.000Z");
@@ -50,4 +52,23 @@ test("stock restoration aggregates repeated inventory rows exactly once", () => 
         ["inventory-a", 5],
         ["inventory-b", 1],
     ]);
+});
+
+test("paid orders follow every required fulfillment stage in order", () => {
+    assert.deepEqual(getAllowedOrderTransitions(OrderStatus.CONFIRMED), [
+        OrderStatus.PROCESSING,
+        OrderStatus.CANCELLED,
+    ]);
+    assert.deepEqual(getAllowedOrderTransitions(OrderStatus.PROCESSING), [
+        OrderStatus.PACKED,
+        OrderStatus.CANCELLED,
+    ]);
+    assert.deepEqual(getAllowedOrderTransitions(OrderStatus.PACKED), [
+        OrderStatus.OUT_FOR_DELIVERY,
+        OrderStatus.CANCELLED,
+    ]);
+    assert.deepEqual(getAllowedOrderTransitions(OrderStatus.OUT_FOR_DELIVERY), [
+        OrderStatus.DELIVERED,
+    ]);
+    assert.deepEqual(getAllowedOrderTransitions(OrderStatus.DELIVERED), []);
 });

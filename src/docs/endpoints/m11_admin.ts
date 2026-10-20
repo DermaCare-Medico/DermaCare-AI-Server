@@ -390,7 +390,7 @@ export const ADMIN_ENDPOINTS: EndpointSpec[] = [
     businessRules: [
       'Contract rule: Combines list and detail retrieval under a single endpoint (?id=...).',
       'Admin only.',
-      'Supports filtering by status (PENDING_PAYMENT, PROCESSING, SHIPPED, DELIVERED, CANCELLED).'
+      'Supports filtering by status (PENDING, CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED).'
     ],
     parameters: [
       { name: 'id', in: 'query', required: false, type: 'string', description: 'Query specific order detail by ID', example: 'ord_990182' },
@@ -438,7 +438,7 @@ export const ADMIN_ENDPOINTS: EndpointSpec[] = [
     statusNotes: 'Specified in MVP contract. Backend route not yet implemented in repository.',
     businessRules: [
       'Admin only.',
-      'Allowed status values: PROCESSING, SHIPPED, DELIVERED, CANCELLED.',
+      'Allowed status values: CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED.',
       'Atomic stock transaction: If status transitions to CANCELLED, reserved stock is automatically returned to inventory.'
     ],
     parameters: [
@@ -452,13 +452,13 @@ export const ADMIN_ENDPOINTS: EndpointSpec[] = [
         type: 'object',
         required: ['status'],
         properties: {
-          status: { type: 'string', enum: ['PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'], example: 'SHIPPED' },
+          status: { type: 'string', enum: ['CONFIRMED', 'PROCESSING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'], example: 'OUT_FOR_DELIVERY' },
           trackingNumber: { type: 'string', example: 'TRK-992147-US' },
           carrier: { type: 'string', example: 'FedEx Express' }
         }
       },
       example: {
-        status: 'SHIPPED',
+        status: 'OUT_FOR_DELIVERY',
         trackingNumber: 'TRK-992147-US',
         carrier: 'FedEx Express'
       }
@@ -471,7 +471,7 @@ export const ADMIN_ENDPOINTS: EndpointSpec[] = [
           success: true,
           data: {
             orderId: 'ord_990182',
-            status: 'SHIPPED',
+            status: 'OUT_FOR_DELIVERY',
             trackingNumber: 'TRK-992147-US',
             updatedAt: '2026-10-15T14:30:00Z'
           }
