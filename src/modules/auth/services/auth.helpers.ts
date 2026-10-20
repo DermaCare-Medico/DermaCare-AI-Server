@@ -5,7 +5,7 @@ import { AUTH_OTP } from "../../../shared/constants/auth.constants.js";
 import { sendOtpEmail } from "../../../shared/services/email.service.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import type { Role } from "../../../generated/prisma/client.js";
-import type { RegisterPayload, RegisterRole, RequestMeta } from "../../../types/auth.types.js";
+import type {RegisterRole, RequestMeta } from "../../../types/auth.types.js";
 import { otpService } from "./otp.service.js";
 import { issueSession } from "./token.service.js";
 
@@ -136,12 +136,24 @@ export const sendCode = async (
   purpose: "EMAIL_VERIFICATION" | "PASSWORD_RESET",
   payload?: Prisma.InputJsonValue,
 ): Promise<void> => {
-  const { id, code } = await otpService.issue({ email, purpose, payload });
+
+const { id, code } = await otpService.issue({
+    email,
+    purpose,
+    payload,
+  });
+
 
   try {
     await sendOtpEmail(email, code, purpose);
+
   } catch (e) {
-    await otpService.discard(id);
+    try {
+      await otpService.discard(id); 
+    } catch (discardError) {
+      console.error("[sendCode] Failed to discard OTP", discardError);
+    }
+
     throw e;
   }
 };

@@ -12,9 +12,10 @@ const envSchema = z
     NODE_ENV: z
       .enum(["development", "production", "test"])
       .default("development"),
+
     // Server
-      PORT: z.coerce.number().int().min(1).max(65535).default(4000),
-      
+    PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+
     // JWT
     JWT_ACCESS_SECRET: z.string().min(96),
     JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
@@ -22,7 +23,7 @@ const envSchema = z
     // OTP
     OTP_SECRET: z.string().min(96),
 
-    // Google authentication (optional until implemented)
+    // Google authentication
     GOOGLE_CLIENT_ID: optionalString,
 
     // SMTP email configuration
@@ -32,10 +33,16 @@ const envSchema = z
     SMTP_PASS: optionalString,
     MAIL_FROM: optionalString,
 
-       // CORS
+    // Gmail OAuth2 email configuration
+    EMAIL_GOOGLE_USER: optionalString,
+    EMAIL_GOOGLE_CLIENT_ID: optionalString,
+    EMAIL_GOOGLE_CLIENT_SECRET: optionalString,
+    EMAIL_GOOGLE_REFRESH_TOKEN: optionalString,
+
+    // CORS
     CORS_ORIGIN: z.string().default("http://localhost:3000"),
 
-    // trust proxy (for reverse proxies like Nginx)
+    // Trust proxy
     TRUST_PROXY: z.coerce.number().int().nonnegative().default(0),
   })
   .superRefine((values, ctx) => {
@@ -54,6 +61,24 @@ const envSchema = z
         message: "SMTP_PASS is required when SMTP_USER is configured",
       });
     }
+
+    const emailGoogleValues = [
+      values.EMAIL_GOOGLE_USER,
+      values.EMAIL_GOOGLE_CLIENT_ID,
+      values.EMAIL_GOOGLE_CLIENT_SECRET,
+      values.EMAIL_GOOGLE_REFRESH_TOKEN,
+    ];
+
+    const hasAnyEmailGoogleValue = emailGoogleValues.some(Boolean);
+    const hasAllEmailGoogleValues = emailGoogleValues.every(Boolean);
+
+    if (hasAnyEmailGoogleValue && !hasAllEmailGoogleValues) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["EMAIL_GOOGLE_REFRESH_TOKEN"],
+        message: "All EMAIL_GOOGLE_* variables must be configured together",
+      });
+    }
   });
 
 const result = envSchema.safeParse(process.env);
@@ -63,7 +88,5 @@ if (!result.success) {
   console.error(result.error.flatten().fieldErrors);
   throw new Error("Environment validation failed");
 }
-
-
 
 export const env = result.data;

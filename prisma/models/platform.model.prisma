@@ -8,8 +8,7 @@ model Notification {
   relatedEntityId   String?          @map("related_entity_id") @db.Uuid
   isRead            Boolean          @default(false) @map("is_read")
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamp(6)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead, createdAt])
   @@map("notifications")
@@ -27,8 +26,7 @@ model AuditLog {
   ipAddress   String?  @map("ip_address") @db.VarChar(45)
   userAgent   String?  @map("user_agent")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-
-  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actor       User?    @relation(fields: [actorUserId], references: [id])
 
   @@index([entityType, entityId])
   @@index([actorUserId, createdAt])
