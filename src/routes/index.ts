@@ -4,8 +4,14 @@ import { authenticate } from "../middlewares/authenticate.middleware.js";
 import { authorize } from "../middlewares/authorize.middleware.js";
 import appointmentRoutes from "../modules/appointments/appointments.routes.js";
 import authRoutes from "../modules/auth/auth.routes.js";
+import doctorRoutes from "../modules/doctors/doctors.routes.js";
 import patientRoutes from "../modules/patients/patients.routes.js";
 import paymentRoutes from "../modules/payments/payments.routes.js";
+import notificationRoutes from "../modules/notifications/notifications.routes.js";
+import adminRoutes from "../modules/admin/admin.routes.js";
+import userRoutes from "../modules/user/user.module.js";
+import storeRoutes from "../modules/stores/stores.routes.js";
+import orderRoutes from "../modules/orders/orders.routes.js";
 
 // Every module router is mounted here, so app.ts never changes when a module is added
 const apiRouter = Router();
@@ -16,13 +22,33 @@ apiRouter.get("/health", (_req, res) => {
 });
 
 apiRouter.use("/auth", authRoutes);
+apiRouter.use("/medicines", storeRoutes);
+apiRouter.use(
+  "/admin",
+  authenticate,
+  authorize(Role.ADMIN),
+  adminRoutes,
+);
+apiRouter.use(
+  "/users",
+  authenticate,
+  authorize(Role.ADMIN),
+  userRoutes,
+);
+apiRouter.use(
+  "/notifications",
+  authenticate,
+  authorize(Role.PATIENT, Role.DOCTOR, Role.ADMIN),
+  notificationRoutes,
+);
 apiRouter.use(
   authenticate,
   authorize(Role.PATIENT),
   patientRoutes,
   appointmentRoutes,
   paymentRoutes,
+  orderRoutes,
+  doctorRoutes,
 );
-// apiRouter.use("/doctors", doctorRoutes);
 
 export default apiRouter;

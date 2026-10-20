@@ -54,8 +54,41 @@ const getMyAppointmentByIdController = async (req: Request, res: Response) => {
     });
 };
 
+const listAppointmentsForAdmin = async (req: Request, res: Response) => {
+    const result = await appointmentService.listAppointmentsForAdmin(getUserId(req), {
+        page: Number(req.query.page),
+        limit: Number(req.query.limit),
+        status: req.query.status as AppointmentStatus | undefined,
+        doctorId: req.query.doctorId as string | undefined,
+        patientId: req.query.patientId as string | undefined,
+    });
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Appointments retrieved successfully",
+        data: result.appointments,
+        pagination: result.pagination,
+    });
+};
+
+const getAppointmentForAdmin = async (req: Request, res: Response) => {
+    const appointment = await appointmentService.getAppointmentForAdmin(
+        getUserId(req),
+        req.params.id!,
+    );
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Appointment retrieved successfully",
+        data: appointment,
+    });
+};
+
 export const appointmentController = {
     createAppointmentController,
     getMyAppointmentsController,
     getMyAppointmentByIdController,
+    listAppointmentsForAdmin,
+    getAppointmentForAdmin,
 };

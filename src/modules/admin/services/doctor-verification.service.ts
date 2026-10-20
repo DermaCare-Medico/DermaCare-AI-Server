@@ -1,0 +1,207 @@
+import {
+    AccountStatus,
+    DoctorApprovalStatus,
+    Prisma,
+    Role,
+} from "../../../generated/prisma/client.js";
+import { prisma } from "../../../lib/prisma.js";
+import { AppError } from "../../../shared/errors/AppError.js";
+import { requireActiveAdmin } from "./admin.service.js";
+
+const doctorDetailsSelect = {
+    id: true,
+    licenseNumber: true,
+    qualifications: true,
+    experienceYears: true,
+    consultationFee: true,
+    bio: true,
+    approvalStatus: true,
+    approvedAt: true,
+    rejectionReason: true,
+    rating: true,
+    ratingCount: true,
+    createdAt: true,
+    updatedAt: true,
+    user: {
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            status: true,
+            emailVerified: true,
+        },
+    },
+    specialization: { select: { id: true, name: true, description: true } },
+    approvedBy: { select: { id: true, name: true } },
+} satisfies Prisma.DoctorProfileSelect;
+
+const getDoctor = async (adminUserId: string, doctorId: string) => {
+    await requireActiveAdmin(adminUserId);
+    const doctor = await prisma.doctorProfile.findUnique({
+        where: { id: doctorId },
+        select: doctorDetailsSelect,
+    });
+    if (!doctor) throw new AppError("Doctor not found", 404);
+    return { ...doctor, documentReferences: [] as string[] };
+};
+
+const listPendingApprovals = async (adminUserId: string, page: number, limit: number) => {
+    await requireActiveAdmin(adminUserId);
+    const where: Prisma.DoctorProfileWhereInput = {
+        approvalStatus: DoctorApprovalStatus.PENDING,
+        user: { deletedAt: null },
+    };
+
+    const [requests, total] = await prisma.$transaction([
+        prisma.doctorProfile.findMany({
+            where,
+            orderBy: { createdAt: "asc" },
+            skip: (page - 1) * limit,
+            take: limit,
+            select: {
+                id: true,
+                licenseNumber: true,
+                qualifications: true,
+                experienceYears: true,
+                createdAt: true,
+                user: {
+                    select: { id: true, name: true, email: true, status: true },
+                },
+                specialization: { select: { id: true, name: true } },
+            },
+        }),
+        prisma.doctorProfile.count({ where }),
+    ]);
+
+    return {
+        requests: requests.map((request) => ({
+            ...request,
+            documentReferences: [] as string[],
+        })),
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+};
+
+const approveDoctor = async (adminUserId: string, doctorId: string) => {
+    await requireActiveAdmin(adminUserId);
+
+    return prisma.$transaction(async (tx) => {
+        const doctor = await tx.doctorProfile.findUnique({
+            where: { id: doctorId },
+            select: {
+                approvalStatus: true,
+                userId: true,
+                user: { select: { status: true, deletedAt: true } },
+            },
+        });
+        if (!doctor) throw new AppError("Doctor approval request not found", 404);
+        if (doctor.approvalStatus !== DoctorApprovalStatus.PENDING) {
+            throw new AppError("Doctor approval request has already been reviewed", 409);
+        }
+        if (
+            doctor.user.deletedAt
+            || doctor.user.status === AccountStatus.SUSPENDED
+            || doctor.user.status === AccountStatus.REJECTED
+        ) {
+            throw new AppError("Doctor account is not eligible for approval", 400);
+        }
+
+        const approvedAt = new Date();
+        const updated = await tx.doctorProfile.updateMany({
+            where: { id: doctorId, approvalStatus: DoctorApprovalStatus.PENDING },
+            data: {
+                approvalStatus: DoctorApprovalStatus.APPROVED,
+                approvedById: adminUserId,
+                approvedAt,
+                rejectionReason: null,
+            },
+        });
+        if (updated.count !== 1) {
+            throw new AppError("Doctor approval request has already been reviewed", 409);
+        }
+
+        await tx.user.update({
+            where: { id: doctor.userId },
+            data: { role: Role.DOCTOR, status: AccountStatus.ACTIVE, suspendedAt: null },
+        });
+        await tx.auditLog.create({
+            data: {
+                actorUserId: adminUserId,
+                action: "DOCTOR_APPROVED",
+                entityType: "DoctorProfile",
+                entityId: doctorId,
+                before: { approvalStatus: DoctorApprovalStatus.PENDING },
+                after: {
+                    approvalStatus: DoctorApprovalStatus.APPROVED,
+                    userRole: Role.DOCTOR,
+                    userStatus: AccountStatus.ACTIVE,
+                },
+            },
+        });
+
+        const approved = await tx.doctorProfile.findUniqueOrThrow({
+            where: { id: doctorId },
+            select: doctorDetailsSelect,
+        });
+        return { ...approved, documentReferences: [] as string[] };
+    });
+};
+
+const rejectDoctor = async (adminUserId: string, doctorId: string, reason: string) => {
+    await requireActiveAdmin(adminUserId);
+
+    return prisma.$transaction(async (tx) => {
+        const doctor = await tx.doctorProfile.findUnique({
+            where: { id: doctorId },
+            select: { approvalStatus: true, userId: true },
+        });
+        if (!doctor) throw new AppError("Doctor approval request not found", 404);
+        if (doctor.approvalStatus !== DoctorApprovalStatus.PENDING) {
+            throw new AppError("Doctor approval request has already been reviewed", 409);
+        }
+
+        const updated = await tx.doctorProfile.updateMany({
+            where: { id: doctorId, approvalStatus: DoctorApprovalStatus.PENDING },
+            data: {
+                approvalStatus: DoctorApprovalStatus.REJECTED,
+                approvedById: adminUserId,
+                approvedAt: null,
+                rejectionReason: reason,
+            },
+        });
+        if (updated.count !== 1) {
+            throw new AppError("Doctor approval request has already been reviewed", 409);
+        }
+
+        await tx.user.update({
+            where: { id: doctor.userId },
+            data: { status: AccountStatus.REJECTED },
+        });
+        await tx.auditLog.create({
+            data: {
+                actorUserId: adminUserId,
+                action: "DOCTOR_REJECTED",
+                entityType: "DoctorProfile",
+                entityId: doctorId,
+                before: { approvalStatus: DoctorApprovalStatus.PENDING },
+                after: { approvalStatus: DoctorApprovalStatus.REJECTED },
+                metadata: { reason },
+            },
+        });
+
+        const rejected = await tx.doctorProfile.findUniqueOrThrow({
+            where: { id: doctorId },
+            select: doctorDetailsSelect,
+        });
+        return { ...rejected, documentReferences: [] as string[] };
+    });
+};
+
+export const doctorVerificationService = {
+    getDoctor,
+    listPendingApprovals,
+    approveDoctor,
+    rejectDoctor,
+};
