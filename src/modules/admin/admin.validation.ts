@@ -53,6 +53,7 @@ export type AdminMedicineListQuery = {
     limit: number;
     search?: string;
     lowStock?: boolean;
+    isAvailable?: boolean;
 };
 
 export type CreateMedicineInput = {
@@ -69,6 +70,7 @@ export type UpdateMedicineInput = {
     price?: number;
     stockQuantity?: number;
     requiresPrescription?: boolean;
+    isAvailable?: boolean;
 };
 
 export type AdminAppointmentListQuery = {
@@ -169,6 +171,7 @@ const medicineListQuerySchema = z.object({
     ...paginationShape,
     search: z.string().trim().min(1).max(200).optional(),
     lowStock: booleanQueryValue.optional(),
+    isAvailable: booleanQueryValue.optional(),
 }).strict();
 
 const createMedicineSchema = z.object({
@@ -187,6 +190,7 @@ const updateMedicineSchema = z.object({
     price: z.coerce.number().positive().max(99999999.99).optional(),
     stockQuantity: z.coerce.number().int().min(0).optional(),
     requiresPrescription: z.boolean().optional(),
+    isAvailable: z.boolean().optional(),
 }).strict().refine(
     (value) => Object.values(value).some((item) => item !== undefined),
     { message: "At least one medicine field is required" },

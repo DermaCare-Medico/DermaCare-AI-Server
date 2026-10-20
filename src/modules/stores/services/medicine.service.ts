@@ -114,7 +114,9 @@ const listMedicinesForAdmin = async (
         }),
         inventory: {
             some: {
-                isAvailable: true,
+                ...(query.isAvailable !== undefined && {
+                    isAvailable: query.isAvailable,
+                }),
                 ...(query.lowStock !== undefined && {
                     stockQuantity: query.lowStock
                         ? { lte: LOW_STOCK_MAXIMUM }
@@ -218,9 +220,16 @@ const updateMedicineForAdmin = async (
         if (!existing) throw new AppError("Medicine not found", 404);
 
         const inventory = existing.inventory[0];
-        const changesInventory = input.price !== undefined || input.stockQuantity !== undefined;
+        const changesInventory = input.price !== undefined
+            || input.stockQuantity !== undefined
+            || input.isAvailable !== undefined;
         if (changesInventory && !inventory) {
             throw new AppError("Medicine inventory not found", 409);
+        }
+
+        const effectiveStock = input.stockQuantity ?? inventory?.stockQuantity ?? 0;
+        if (input.isAvailable === true && effectiveStock <= 0) {
+            throw new AppError("Medicine cannot be activated without stock", 400);
         }
 
         if (
@@ -247,8 +256,11 @@ const updateMedicineForAdmin = async (
                     ...(input.price !== undefined && { price: input.price }),
                     ...(input.stockQuantity !== undefined && {
                         stockQuantity: input.stockQuantity,
-                        isAvailable: input.stockQuantity > 0,
                     }),
+                    ...(input.isAvailable !== undefined && {
+                        isAvailable: input.isAvailable,
+                    }),
+                    ...(input.stockQuantity === 0 && { isAvailable: false }),
                 },
             });
         }
@@ -265,6 +277,7 @@ const updateMedicineForAdmin = async (
                     requiresPrescription: existing.requiresPrescription,
                     price: inventory?.price.toString() ?? null,
                     stockQuantity: inventory?.stockQuantity ?? null,
+                    isAvailable: inventory?.isAvailable ?? null,
                 },
                 after: input,
             },
