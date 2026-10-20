@@ -1,7 +1,45 @@
-import { AccountStatus, Prisma } from "../../../generated/prisma/client.js";
+import {
+    AccountStatus,
+    NotificationType,
+    Prisma,
+} from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
+import { CreateNotificationInput } from "../../../types/notification.types.js";
 import type { NotificationListQuery } from "../notifications.validation.js";
+
+
+
+export const createNotification = async (
+    input: CreateNotificationInput,
+    transactionClient?: Prisma.TransactionClient,
+) => {
+    const client = transactionClient ?? prisma;
+    const recipient = await client.user.findUnique({
+        where: { id: input.userId },
+        select: { status: true, deletedAt: true },
+    });
+
+    if (!recipient) throw new AppError("Notification recipient not found", 404);
+    if (recipient.status !== AccountStatus.ACTIVE || recipient.deletedAt) {
+        throw new AppError("Notification recipient account is not active", 403);
+    }
+
+    return client.notification.create({
+        data: {
+            userId: input.userId,
+            title: input.title,
+            message: input.message,
+            notificationType: input.notificationType,
+            ...(input.relatedEntityType !== undefined && {
+                relatedEntityType: input.relatedEntityType,
+            }),
+            ...(input.relatedEntityId !== undefined && {
+                relatedEntityId: input.relatedEntityId,
+            }),
+        },
+    });
+};
 
 const requireActiveUser = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -74,4 +112,21 @@ const markAsRead = async (userId: string, notificationId: string) => {
     });
 };
 
-export const notificationService = { listNotifications, getUnreadCount, markAsRead };
+const markAllAsRead = async (userId: string) => {
+    await requireActiveUser(userId);
+
+    const result = await prisma.notification.updateMany({
+        where: { userId, isRead: false },
+        data: { isRead: true },
+    });
+
+    return result.count;
+};
+
+export const notificationService = {
+    createNotification,
+    listNotifications,
+    getUnreadCount,
+    markAsRead,
+    markAllAsRead,
+};

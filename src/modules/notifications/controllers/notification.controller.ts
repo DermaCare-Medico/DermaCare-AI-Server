@@ -51,4 +51,23 @@ const markAsRead = async (req: Request, res: Response) => {
     });
 };
 
-export const notificationController = { listNotifications, getUnreadCount, markAsRead };
+const markAllAsRead = async (req: Request, res: Response) => {
+    const userId = req.auth?.userId;
+    if (!userId) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
+
+    const updatedCount = await notificationService.markAllAsRead(userId);
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Notifications marked as read successfully",
+        data: { updatedCount },
+    });
+};
+
+export const notificationController = {
+    listNotifications,
+    getUnreadCount,
+    markAsRead,
+    markAllAsRead,
+};

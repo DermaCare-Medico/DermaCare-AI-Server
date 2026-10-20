@@ -21,6 +21,11 @@ notificationRouter.get(
 );
 
 notificationRouter.patch(
+    "/read-all",
+    asyncHandler(notificationController.markAllAsRead),
+);
+
+notificationRouter.patch(
     "/:id/read",
     validateNotificationId,
     asyncHandler(notificationController.markAsRead),
