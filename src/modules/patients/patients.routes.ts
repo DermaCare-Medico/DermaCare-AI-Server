@@ -25,6 +25,10 @@ patientRouter.get(
     "/patients/me/dashboard",
     asyncHandler(patientController.getMyDashboardController),
 );
+patientRouter.get(
+    "/patients/me/medications",
+    asyncHandler(medicationController.listMyMedicationsController),
+);
 patientRouter.post(
     "/patients/me/medications",
     validateCreateMedication,
