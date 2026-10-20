@@ -11,7 +11,7 @@ const MODEL_PATH = path.join(
   ROOT,
   "model",
   "vit-skin-disease",
-  "model-int8.onnx"
+  "model.onnx"
 );
 
 const CONFIG_PATH = path.join(
@@ -31,7 +31,7 @@ const PREPROCESSOR_CONFIG_PATH = path.join(
 const IMAGE_PATH = path.join(
   ROOT,
   "test-images",
-  "skin-test-5.jpg"
+  "skin-test.jpg"
 );
 
 function getMemoryMB() {
