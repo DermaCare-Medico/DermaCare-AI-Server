@@ -5,6 +5,19 @@ import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { orderService } from "../services/order.service.js";
 
+const createOrder = async (req: Request, res: Response) => {
+    const userId = req.auth?.userId;
+    if (!userId) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
+    const order = await orderService.createOrder(userId, req.body);
+
+    return res.status(HTTP_STATUS.CREATED).json({
+        success: true,
+        statusCode: HTTP_STATUS.CREATED,
+        message: "Order placed successfully",
+        data: order,
+    });
+};
+
 const listOrdersForAdmin = async (req: Request, res: Response) => {
     const userId = req.auth?.userId;
     if (!userId) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
@@ -55,6 +68,7 @@ const updateOrderStatusForAdmin = async (req: Request, res: Response) => {
 };
 
 export const orderController = {
+    createOrder,
     listOrdersForAdmin,
     getOrderForAdmin,
     updateOrderStatusForAdmin,

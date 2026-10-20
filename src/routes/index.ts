@@ -11,6 +11,7 @@ import notificationRoutes from "../modules/notifications/notifications.routes.js
 import adminRoutes from "../modules/admin/admin.routes.js";
 import userRoutes from "../modules/user/user.module.js";
 import storeRoutes from "../modules/stores/stores.routes.js";
+import orderRoutes from "../modules/orders/orders.routes.js";
 
 // Every module router is mounted here, so app.ts never changes when a module is added
 const apiRouter = Router();
@@ -46,6 +47,7 @@ apiRouter.use(
   patientRoutes,
   appointmentRoutes,
   paymentRoutes,
+  orderRoutes,
   doctorRoutes,
 );
 

@@ -1,4 +1,9 @@
-import { OrderStatus, Prisma } from "../../../generated/prisma/client.js";
+import {
+    AccountStatus,
+    OrderStatus,
+    Prisma,
+    Role,
+} from "../../../generated/prisma/client.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { prisma } from "../../../lib/prisma.js";
 import type {
@@ -6,6 +11,151 @@ import type {
     AdminOrderStatusInput,
 } from "../../admin/admin.validation.js";
 import { requireActiveAdmin } from "../../admin/services/admin.service.js";
+import type { CreateOrderInput } from "../orders.validation.js";
+
+const getActivePatient = async (userId: string) => {
+    const user = await prisma.user.findFirst({
+        where: {
+            id: userId,
+            role: Role.PATIENT,
+            status: AccountStatus.ACTIVE,
+            deletedAt: null,
+        },
+        select: { patientProfile: { select: { id: true } } },
+    });
+    if (!user) throw new AppError("Only active patients may place orders", 403);
+    if (!user.patientProfile) throw new AppError("Patient profile not found", 404);
+    return user.patientProfile;
+};
+
+const createOrder = async (userId: string, input: CreateOrderInput) => {
+    const patient = await getActivePatient(userId);
+
+    try {
+        return await prisma.$transaction(async (tx) => {
+            const medicineIds = input.items.map((item) => item.medicineId);
+            const inventories = await tx.storeInventory.findMany({
+                where: {
+                    medicineId: { in: medicineIds },
+                    isAvailable: true,
+                    medicine: { isVerified: true },
+                },
+                select: {
+                    id: true,
+                    medicineId: true,
+                    price: true,
+                    stockQuantity: true,
+                    medicine: {
+                        select: {
+                            name: true,
+                            requiresPrescription: true,
+                        },
+                    },
+                },
+            });
+
+            if (inventories.length !== input.items.length) {
+                throw new AppError("One or more medicines are unavailable", 400);
+            }
+
+            const inventoryByMedicine = new Map(
+                inventories.map((inventory) => [inventory.medicineId, inventory]),
+            );
+            const prescription = input.prescriptionId
+                ? await tx.prescription.findFirst({
+                    where: {
+                        id: input.prescriptionId,
+                        sentAt: { not: null },
+                        appointment: { patientId: patient.id },
+                    },
+                    select: { items: { select: { medicineId: true } } },
+                })
+                : null;
+
+            if (input.prescriptionId && !prescription) {
+                throw new AppError("Prescription not found", 404);
+            }
+            const prescribedMedicineIds = new Set(
+                prescription?.items.map((item) => item.medicineId) ?? [],
+            );
+
+            const orderItems = input.items.map((item) => {
+                const inventory = inventoryByMedicine.get(item.medicineId)!;
+                if (
+                    inventory.medicine.requiresPrescription
+                    && !prescribedMedicineIds.has(item.medicineId)
+                ) {
+                    throw new AppError(
+                        `${inventory.medicine.name} requires an eligible prescription`,
+                        400,
+                    );
+                }
+                if (inventory.stockQuantity < item.quantity) {
+                    throw new AppError(`Insufficient stock for ${inventory.medicine.name}`, 409);
+                }
+
+                return {
+                    inventoryId: inventory.id,
+                    medicineName: inventory.medicine.name,
+                    quantity: item.quantity,
+                    unitPrice: inventory.price,
+                    subtotal: inventory.price.mul(item.quantity),
+                };
+            });
+
+            for (const item of orderItems) {
+                const deducted = await tx.storeInventory.updateMany({
+                    where: {
+                        id: item.inventoryId,
+                        isAvailable: true,
+                        stockQuantity: { gte: item.quantity },
+                    },
+                    data: { stockQuantity: { decrement: item.quantity } },
+                });
+                if (deducted.count !== 1) {
+                    throw new AppError(`Insufficient stock for ${item.medicineName}`, 409);
+                }
+            }
+
+            const totalAmount = orderItems.reduce(
+                (total, item) => total.add(item.subtotal),
+                new Prisma.Decimal(0),
+            );
+
+            return tx.order.create({
+                data: {
+                    patientId: patient.id,
+                    prescriptionId: input.prescriptionId,
+                    deliveryAddress: input.deliveryAddress,
+                    totalAmount,
+                    items: { create: orderItems },
+                },
+                select: {
+                    id: true,
+                    status: true,
+                    prescriptionId: true,
+                    totalAmount: true,
+                    deliveryAddress: true,
+                    createdAt: true,
+                    items: {
+                        select: {
+                            id: true,
+                            medicineName: true,
+                            quantity: true,
+                            unitPrice: true,
+                            subtotal: true,
+                        },
+                    },
+                },
+            });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+            throw new AppError("Stock changed while placing the order; please retry", 409);
+        }
+        throw error;
+    }
+};
 
 const listOrdersForAdmin = async (adminUserId: string, query: AdminOrderListQuery) => {
     await requireActiveAdmin(adminUserId);
@@ -174,6 +324,7 @@ const updateOrderStatusForAdmin = async (
 };
 
 export const orderService = {
+    createOrder,
     listOrdersForAdmin,
     getOrderForAdmin,
     updateOrderStatusForAdmin,
