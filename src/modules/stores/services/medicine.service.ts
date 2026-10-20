@@ -7,6 +7,7 @@ import type {
 } from "../../admin/admin.validation.js";
 import { requireActiveAdmin } from "../../admin/services/admin.service.js";
 import { AppError } from "../../../shared/errors/AppError.js";
+import type { PublicMedicineListQuery } from "../stores.validation.js";
 
 const LOW_STOCK_MAXIMUM = 10;
 
@@ -30,6 +31,75 @@ const medicineSelect = {
     },
 } satisfies Prisma.MedicineSelect;
 
+const publicMedicineSelect = {
+    id: true,
+    name: true,
+    description: true,
+    requiresPrescription: true,
+    inventory: {
+        where: { isAvailable: true, stockQuantity: { gt: 0 } },
+        take: 1,
+        select: { price: true, stockQuantity: true },
+    },
+} satisfies Prisma.MedicineSelect;
+
+type PublicMedicineRecord = Prisma.MedicineGetPayload<{
+    select: typeof publicMedicineSelect;
+}>;
+
+const presentPublicMedicine = (medicine: PublicMedicineRecord) => ({
+    id: medicine.id,
+    name: medicine.name,
+    description: medicine.description,
+    requiresPrescription: medicine.requiresPrescription,
+    price: medicine.inventory[0]!.price,
+    stockQuantity: medicine.inventory[0]!.stockQuantity,
+});
+
+const publicMedicineWhere = (search?: string): Prisma.MedicineWhereInput => ({
+    isVerified: true,
+    inventory: { some: { isAvailable: true, stockQuantity: { gt: 0 } } },
+    ...(search && {
+        OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { description: { contains: search, mode: "insensitive" } },
+        ],
+    }),
+});
+
+const listPublicMedicines = async (query: PublicMedicineListQuery) => {
+    const where = publicMedicineWhere(query.search);
+    const [medicines, total] = await prisma.$transaction([
+        prisma.medicine.findMany({
+            where,
+            select: publicMedicineSelect,
+            orderBy: { name: "asc" },
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+        }),
+        prisma.medicine.count({ where }),
+    ]);
+
+    return {
+        medicines: medicines.map(presentPublicMedicine),
+        pagination: {
+            page: query.page,
+            limit: query.limit,
+            total,
+            totalPages: Math.ceil(total / query.limit),
+        },
+    };
+};
+
+const getPublicMedicine = async (medicineId: string) => {
+    const medicine = await prisma.medicine.findFirst({
+        where: { id: medicineId, ...publicMedicineWhere() },
+        select: publicMedicineSelect,
+    });
+    if (!medicine) throw new AppError("Medicine not found", 404);
+    return presentPublicMedicine(medicine);
+};
+
 const listMedicinesForAdmin = async (
     adminUserId: string,
     query: AdminMedicineListQuery,
@@ -42,11 +112,16 @@ const listMedicinesForAdmin = async (
                 { description: { contains: query.search, mode: "insensitive" } },
             ],
         }),
-        ...(query.lowStock !== undefined && {
-            inventory: query.lowStock
-                ? { some: { stockQuantity: { lte: LOW_STOCK_MAXIMUM } } }
-                : { some: { stockQuantity: { gt: LOW_STOCK_MAXIMUM } } },
-        }),
+        inventory: {
+            some: {
+                isAvailable: true,
+                ...(query.lowStock !== undefined && {
+                    stockQuantity: query.lowStock
+                        ? { lte: LOW_STOCK_MAXIMUM }
+                        : { gt: LOW_STOCK_MAXIMUM },
+                }),
+            },
+        },
     };
 
     const [medicines, total] = await prisma.$transaction([
@@ -238,6 +313,8 @@ const deactivateMedicineForAdmin = async (adminUserId: string, medicineId: strin
 };
 
 export const medicineService = {
+    listPublicMedicines,
+    getPublicMedicine,
     listMedicinesForAdmin,
     createMedicineForAdmin,
     getMedicineForAdmin,

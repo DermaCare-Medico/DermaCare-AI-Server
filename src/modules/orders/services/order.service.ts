@@ -115,7 +115,10 @@ const updateOrderStatusForAdmin = async (
     return prisma.$transaction(async (tx) => {
         const existing = await tx.order.findUnique({
             where: { id: orderId },
-            select: { status: true },
+            select: {
+                status: true,
+                items: { select: { inventoryId: true, quantity: true } },
+            },
         });
         if (!existing) throw new AppError("Order not found", 404);
         if (!allowedTransitions[existing.status].includes(input.status)) {
@@ -130,6 +133,26 @@ const updateOrderStatusForAdmin = async (
             data: { status: input.status },
         });
         if (updated.count !== 1) throw new AppError("Order status changed; please retry", 409);
+
+        if (input.status === OrderStatus.CANCELLED) {
+            const quantitiesByInventory = existing.items.reduce<Map<string, number>>(
+                (quantities, item) => {
+                    quantities.set(
+                        item.inventoryId,
+                        (quantities.get(item.inventoryId) ?? 0) + item.quantity,
+                    );
+                    return quantities;
+                },
+                new Map(),
+            );
+
+            for (const [inventoryId, quantity] of quantitiesByInventory) {
+                await tx.storeInventory.update({
+                    where: { id: inventoryId },
+                    data: { stockQuantity: { increment: quantity } },
+                });
+            }
+        }
 
         await tx.auditLog.create({
             data: {

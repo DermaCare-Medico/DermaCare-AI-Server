@@ -10,6 +10,31 @@ const getAdminUserId = (req: Request) => {
     return userId;
 };
 
+const listPublicMedicines = async (req: Request, res: Response) => {
+    const result = await medicineService.listPublicMedicines({
+        page: Number(req.query.page),
+        limit: Number(req.query.limit),
+        search: req.query.search as string | undefined,
+    });
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Medicines retrieved successfully",
+        data: result.medicines,
+        pagination: result.pagination,
+    });
+};
+
+const getPublicMedicine = async (req: Request, res: Response) => {
+    const medicine = await medicineService.getPublicMedicine(req.params.id!);
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Medicine retrieved successfully",
+        data: medicine,
+    });
+};
+
 const listMedicinesForAdmin = async (req: Request, res: Response) => {
     const result = await medicineService.listMedicinesForAdmin(getAdminUserId(req), {
         page: Number(req.query.page),
@@ -77,6 +102,8 @@ const deactivateMedicineForAdmin = async (req: Request, res: Response) => {
 };
 
 export const medicineController = {
+    listPublicMedicines,
+    getPublicMedicine,
     listMedicinesForAdmin,
     createMedicineForAdmin,
     getMedicineForAdmin,
