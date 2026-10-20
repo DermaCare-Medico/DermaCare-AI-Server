@@ -62,6 +62,14 @@ export type CreateMedicineInput = {
     requiresPrescription: boolean;
 };
 
+export type UpdateMedicineInput = {
+    name?: string;
+    description?: string | null;
+    price?: number;
+    stockQuantity?: number;
+    requiresPrescription?: boolean;
+};
+
 const paginationShape = {
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -151,6 +159,19 @@ const createMedicineSchema = z.object({
     requiresPrescription: z.boolean(),
 }).strict();
 
+const medicineIdParamsSchema = z.object({ id: uuidSchema }).strict();
+
+const updateMedicineSchema = z.object({
+    name: z.string().trim().min(2).max(200).optional(),
+    description: z.string().trim().min(1).max(2000).nullable().optional(),
+    price: z.coerce.number().positive().max(99999999.99).optional(),
+    stockQuantity: z.coerce.number().int().min(0).optional(),
+    requiresPrescription: z.boolean().optional(),
+}).strict().refine(
+    (value) => Object.values(value).some((item) => item !== undefined),
+    { message: "At least one medicine field is required" },
+);
+
 export const validateAdminPayoutList = validateRequest({ query: payoutListQuerySchema });
 export const validateAdminPayoutId = validateRequest({ params: payoutIdParamsSchema });
 export const validateAdminOrderList = validateRequest({ query: orderListQuerySchema });
@@ -180,3 +201,8 @@ export const validateAdminDoctorRejection = validateRequest({
 });
 export const validateAdminMedicineList = validateRequest({ query: medicineListQuerySchema });
 export const validateAdminMedicineCreate = validateRequest({ body: createMedicineSchema });
+export const validateAdminMedicineId = validateRequest({ params: medicineIdParamsSchema });
+export const validateAdminMedicineUpdate = validateRequest({
+    params: medicineIdParamsSchema,
+    body: updateMedicineSchema,
+});

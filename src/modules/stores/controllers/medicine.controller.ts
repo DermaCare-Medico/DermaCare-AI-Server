@@ -36,4 +36,50 @@ const createMedicineForAdmin = async (req: Request, res: Response) => {
     });
 };
 
-export const medicineController = { listMedicinesForAdmin, createMedicineForAdmin };
+const getMedicineForAdmin = async (req: Request, res: Response) => {
+    const medicine = await medicineService.getMedicineForAdmin(
+        getAdminUserId(req),
+        req.params.id!,
+    );
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Medicine retrieved successfully",
+        data: medicine,
+    });
+};
+
+const updateMedicineForAdmin = async (req: Request, res: Response) => {
+    const medicine = await medicineService.updateMedicineForAdmin(
+        getAdminUserId(req),
+        req.params.id!,
+        req.body,
+    );
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Medicine updated successfully",
+        data: medicine,
+    });
+};
+
+const deactivateMedicineForAdmin = async (req: Request, res: Response) => {
+    const medicine = await medicineService.deactivateMedicineForAdmin(
+        getAdminUserId(req),
+        req.params.id!,
+    );
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Medicine deactivated successfully",
+        data: medicine,
+    });
+};
+
+export const medicineController = {
+    listMedicinesForAdmin,
+    createMedicineForAdmin,
+    getMedicineForAdmin,
+    updateMedicineForAdmin,
+    deactivateMedicineForAdmin,
+};

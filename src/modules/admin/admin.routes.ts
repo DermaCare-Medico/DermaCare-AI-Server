@@ -17,7 +17,9 @@ import {
     validateAdminDoctorApprovalList,
     validateAdminDoctorRejection,
     validateAdminMedicineCreate,
+    validateAdminMedicineId,
     validateAdminMedicineList,
+    validateAdminMedicineUpdate,
     validateAdminPayoutId,
     validateAdminPayoutList,
     validateAdminUserList,
@@ -106,6 +108,21 @@ adminRouter.post(
     "/medicines",
     validateAdminMedicineCreate,
     asyncHandler(medicineController.createMedicineForAdmin),
+);
+adminRouter.get(
+    "/medicines/:id",
+    validateAdminMedicineId,
+    asyncHandler(medicineController.getMedicineForAdmin),
+);
+adminRouter.patch(
+    "/medicines/:id",
+    validateAdminMedicineUpdate,
+    asyncHandler(medicineController.updateMedicineForAdmin),
+);
+adminRouter.delete(
+    "/medicines/:id",
+    validateAdminMedicineId,
+    asyncHandler(medicineController.deactivateMedicineForAdmin),
 );
 
 export default adminRouter;
