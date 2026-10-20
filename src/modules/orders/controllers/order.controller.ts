@@ -24,4 +24,38 @@ const listOrdersForAdmin = async (req: Request, res: Response) => {
     });
 };
 
-export const orderController = { listOrdersForAdmin };
+const getOrderForAdmin = async (req: Request, res: Response) => {
+    const userId = req.auth?.userId;
+    if (!userId) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
+    const order = await orderService.getOrderForAdmin(userId, req.params.id!);
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Order retrieved successfully",
+        data: order,
+    });
+};
+
+const updateOrderStatusForAdmin = async (req: Request, res: Response) => {
+    const userId = req.auth?.userId;
+    if (!userId) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
+    const order = await orderService.updateOrderStatusForAdmin(
+        userId,
+        req.params.id!,
+        req.body,
+    );
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Order status updated successfully",
+        data: order,
+    });
+};
+
+export const orderController = {
+    listOrdersForAdmin,
+    getOrderForAdmin,
+    updateOrderStatusForAdmin,
+};

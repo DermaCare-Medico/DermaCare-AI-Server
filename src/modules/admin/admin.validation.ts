@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { OrderStatus, PayoutStatus } from "../../generated/prisma/enums.js";
+import {
+    AccountStatus,
+    OrderStatus,
+    PayoutStatus,
+    Role,
+} from "../../generated/prisma/enums.js";
 import { validateRequest } from "../../middlewares/validateRequest.js";
 import { uuidSchema } from "../../shared/validators/common.validator.js";
 
@@ -14,6 +19,19 @@ export type AdminOrderListQuery = {
     page: number;
     limit: number;
     status?: OrderStatus;
+};
+
+export type AdminUserListQuery = {
+    page: number;
+    limit: number;
+    search?: string;
+    role?: Role;
+    status?: AccountStatus;
+};
+
+export type AdminOrderStatusInput = {
+    status: OrderStatus;
+    reason?: string;
 };
 
 const paginationShape = {
@@ -33,6 +51,40 @@ const orderListQuerySchema = z.object({
     status: z.enum(OrderStatus).optional(),
 }).strict();
 
+const orderIdParamsSchema = z.object({ id: uuidSchema }).strict();
+
+const orderStatusSchema = z.object({
+    status: z.enum([
+        OrderStatus.CONFIRMED,
+        OrderStatus.PROCESSING,
+        OrderStatus.SHIPPED,
+        OrderStatus.DELIVERED,
+        OrderStatus.CANCELLED,
+    ]),
+    reason: z.string().trim().min(3).max(500).optional(),
+}).strict().superRefine((value, context) => {
+    if (value.status === OrderStatus.CANCELLED && !value.reason) {
+        context.addIssue({
+            code: "custom",
+            path: ["reason"],
+            message: "A reason is required when rejecting or cancelling an order",
+        });
+    }
+});
+
+const userListQuerySchema = z.object({
+    ...paginationShape,
+    search: z.string().trim().min(1).max(150).optional(),
+    role: z.enum(Role).optional(),
+    status: z.enum(AccountStatus).optional(),
+}).strict();
+
 export const validateAdminPayoutList = validateRequest({ query: payoutListQuerySchema });
 export const validateAdminPayoutId = validateRequest({ params: payoutIdParamsSchema });
 export const validateAdminOrderList = validateRequest({ query: orderListQuerySchema });
+export const validateAdminOrderId = validateRequest({ params: orderIdParamsSchema });
+export const validateAdminOrderStatus = validateRequest({
+    params: orderIdParamsSchema,
+    body: orderStatusSchema,
+});
+export const validateAdminUserList = validateRequest({ query: userListQuerySchema });
