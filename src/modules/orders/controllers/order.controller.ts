@@ -18,6 +18,37 @@ const createOrder = async (req: Request, res: Response) => {
     });
 };
 
+const listMyOrders = async (req: Request, res: Response) => {
+    const userId = req.auth?.userId;
+    if (!userId) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
+    const result = await orderService.listMyOrders(userId, {
+        page: Number(req.query.page),
+        limit: Number(req.query.limit),
+        status: req.query.status as OrderStatus | undefined,
+    });
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Orders retrieved successfully",
+        data: result.orders,
+        pagination: result.pagination,
+    });
+};
+
+const getMyOrder = async (req: Request, res: Response) => {
+    const userId = req.auth?.userId;
+    if (!userId) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
+    const order = await orderService.getMyOrder(userId, req.params.id!);
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Order retrieved successfully",
+        data: order,
+    });
+};
+
 const listOrdersForAdmin = async (req: Request, res: Response) => {
     const userId = req.auth?.userId;
     if (!userId) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
@@ -69,6 +100,8 @@ const updateOrderStatusForAdmin = async (req: Request, res: Response) => {
 
 export const orderController = {
     createOrder,
+    listMyOrders,
+    getMyOrder,
     listOrdersForAdmin,
     getOrderForAdmin,
     updateOrderStatusForAdmin,

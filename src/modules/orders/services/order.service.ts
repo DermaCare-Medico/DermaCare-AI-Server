@@ -11,7 +11,10 @@ import type {
     AdminOrderStatusInput,
 } from "../../admin/admin.validation.js";
 import { requireActiveAdmin } from "../../admin/services/admin.service.js";
-import type { CreateOrderInput } from "../orders.validation.js";
+import type {
+    CreateOrderInput,
+    PatientOrderListQuery,
+} from "../orders.validation.js";
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -23,7 +26,7 @@ const getActivePatient = async (userId: string) => {
         },
         select: { patientProfile: { select: { id: true } } },
     });
-    if (!user) throw new AppError("Only active patients may place orders", 403);
+    if (!user) throw new AppError("Only active patients may access orders", 403);
     if (!user.patientProfile) throw new AppError("Patient profile not found", 404);
     return user.patientProfile;
 };
@@ -155,6 +158,70 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
         }
         throw error;
     }
+};
+
+const listMyOrders = async (userId: string, query: PatientOrderListQuery) => {
+    const patient = await getActivePatient(userId);
+    const where: Prisma.OrderWhereInput = {
+        patientId: patient.id,
+        ...(query.status && { status: query.status }),
+    };
+
+    const [orders, total] = await prisma.$transaction([
+        prisma.order.findMany({
+            where,
+            orderBy: { createdAt: "desc" },
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+            select: {
+                id: true,
+                status: true,
+                prescriptionId: true,
+                totalAmount: true,
+                createdAt: true,
+                updatedAt: true,
+                _count: { select: { items: true } },
+            },
+        }),
+        prisma.order.count({ where }),
+    ]);
+
+    return {
+        orders,
+        pagination: {
+            page: query.page,
+            limit: query.limit,
+            total,
+            totalPages: Math.ceil(total / query.limit),
+        },
+    };
+};
+
+const getMyOrder = async (userId: string, orderId: string) => {
+    const patient = await getActivePatient(userId);
+    const order = await prisma.order.findFirst({
+        where: { id: orderId, patientId: patient.id },
+        select: {
+            id: true,
+            status: true,
+            prescriptionId: true,
+            totalAmount: true,
+            deliveryAddress: true,
+            createdAt: true,
+            updatedAt: true,
+            items: {
+                select: {
+                    id: true,
+                    medicineName: true,
+                    quantity: true,
+                    unitPrice: true,
+                    subtotal: true,
+                },
+            },
+        },
+    });
+    if (!order) throw new AppError("Order not found", 404);
+    return order;
 };
 
 const listOrdersForAdmin = async (adminUserId: string, query: AdminOrderListQuery) => {
@@ -325,6 +392,8 @@ const updateOrderStatusForAdmin = async (
 
 export const orderService = {
     createOrder,
+    listMyOrders,
+    getMyOrder,
     listOrdersForAdmin,
     getOrderForAdmin,
     updateOrderStatusForAdmin,
