@@ -2,12 +2,14 @@ import {
     AccountStatus,
     AppointmentStatus,
     DoctorApprovalStatus,
+    NotificationType,
     Prisma,
     Role,
     SlotStatus,
     TransactionStatus,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
+import { createNotification } from "../../notifications/services/notification.service.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import type {
     AppointmentListQuery,
@@ -126,7 +128,7 @@ const createAppointment = async (
                     approvalStatus: DoctorApprovalStatus.APPROVED,
                     user: { status: AccountStatus.ACTIVE, deletedAt: null },
                 },
-                select: { id: true },
+                select: { id: true, userId: true },
             });
             if (!doctor) throw httpError(404, "Approved doctor not found");
 
@@ -158,7 +160,7 @@ const createAppointment = async (
             });
             if (claimed.count !== 1) throw httpError(409, "Slot was reserved by another patient");
 
-            return tx.appointment.create({
+            const appointment = await tx.appointment.create({
                 data: {
                     patientId: patient.id,
                     doctorId: doctor.id,
@@ -171,6 +173,17 @@ const createAppointment = async (
                 },
                 select: appointmentSelect,
             });
+
+            await createNotification({
+                userId: doctor.userId,
+                title: "New appointment booked",
+                message: "A new appointment has been booked. Open your appointments to review the details.",
+                notificationType: NotificationType.APPOINTMENT,
+                relatedEntityType: "Appointment",
+                relatedEntityId: appointment.id,
+            }, tx);
+
+            return appointment;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
         return presentAppointment(appointment, true);

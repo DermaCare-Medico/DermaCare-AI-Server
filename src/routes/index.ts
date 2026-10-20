@@ -8,6 +8,8 @@ import doctorRoutes from "../modules/doctors/doctors.routes.js";
 import patientRoutes from "../modules/patients/patients.routes.js";
 import paymentRoutes from "../modules/payments/payments.routes.js";
 import notificationRoutes from "../modules/notifications/notifications.routes.js";
+import adminRoutes from "../modules/admin/admin.routes.js";
+import userRoutes from "../modules/user/user.module.js";
 
 // Every module router is mounted here, so app.ts never changes when a module is added
 const apiRouter = Router();
@@ -18,6 +20,18 @@ apiRouter.get("/health", (_req, res) => {
 });
 
 apiRouter.use("/auth", authRoutes);
+apiRouter.use(
+  "/admin",
+  authenticate,
+  authorize(Role.ADMIN),
+  adminRoutes,
+);
+apiRouter.use(
+  "/users",
+  authenticate,
+  authorize(Role.ADMIN),
+  userRoutes,
+);
 apiRouter.use(
   "/notifications",
   authenticate,
