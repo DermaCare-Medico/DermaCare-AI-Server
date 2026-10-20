@@ -2,13 +2,18 @@ import { Router } from "express";
 
 import { asyncHandler } from "../../middlewares/asyncHandler.js";
 import { dashboardController } from "./controllers/dashboard.controller.js";
+import { adminController } from "./controllers/admin.controller.js";
 import { doctorPayoutAdminController } from "./controllers/doctor-payout-admin.controller.js";
 import { userManagementController } from "./controllers/user-management.controller.js";
 import { doctorVerificationController } from "./controllers/doctor-verification.controller.js";
 import { orderController } from "../orders/controllers/order.controller.js";
 import { medicineController } from "../stores/controllers/medicine.controller.js";
+import { appointmentController } from "../appointments/controllers/appointment.controller.js";
 import {
     validateAdminOrderList,
+    validateAdminAppointmentId,
+    validateAdminAppointmentList,
+    validateAdminAuditLogList,
     validateAdminOrderId,
     validateAdminOrderStatus,
     validateAdminDoctorList,
@@ -123,6 +128,21 @@ adminRouter.delete(
     "/medicines/:id",
     validateAdminMedicineId,
     asyncHandler(medicineController.deactivateMedicineForAdmin),
+);
+adminRouter.get(
+    "/appointments",
+    validateAdminAppointmentList,
+    asyncHandler(appointmentController.listAppointmentsForAdmin),
+);
+adminRouter.get(
+    "/appointments/:id",
+    validateAdminAppointmentId,
+    asyncHandler(appointmentController.getAppointmentForAdmin),
+);
+adminRouter.get(
+    "/audit-logs",
+    validateAdminAuditLogList,
+    asyncHandler(adminController.getAuditLogs),
 );
 
 export default adminRouter;

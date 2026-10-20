@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
     AccountStatus,
+    AppointmentStatus,
     DoctorApprovalStatus,
     OrderStatus,
     PayoutStatus,
@@ -68,6 +69,25 @@ export type UpdateMedicineInput = {
     price?: number;
     stockQuantity?: number;
     requiresPrescription?: boolean;
+};
+
+export type AdminAppointmentListQuery = {
+    page: number;
+    limit: number;
+    status?: AppointmentStatus;
+    doctorId?: string;
+    patientId?: string;
+};
+
+export type AdminAuditLogListQuery = {
+    page: number;
+    limit: number;
+    dateFrom?: Date;
+    dateTo?: Date;
+    actorUserId?: string;
+    action?: string;
+    entityType?: string;
+    entityId?: string;
 };
 
 const paginationShape = {
@@ -172,6 +192,28 @@ const updateMedicineSchema = z.object({
     { message: "At least one medicine field is required" },
 );
 
+const appointmentListAdminQuerySchema = z.object({
+    ...paginationShape,
+    status: z.enum(AppointmentStatus).optional(),
+    doctorId: uuidSchema.optional(),
+    patientId: uuidSchema.optional(),
+}).strict();
+
+const appointmentIdAdminParamsSchema = z.object({ id: uuidSchema }).strict();
+
+const auditLogListQuerySchema = z.object({
+    ...paginationShape,
+    dateFrom: z.coerce.date().optional(),
+    dateTo: z.coerce.date().optional(),
+    actorUserId: uuidSchema.optional(),
+    action: z.string().trim().min(1).max(100).optional(),
+    entityType: z.string().trim().min(1).max(100).optional(),
+    entityId: uuidSchema.optional(),
+}).strict().refine(
+    (value) => !value.dateFrom || !value.dateTo || value.dateFrom <= value.dateTo,
+    { message: "dateFrom must be before or equal to dateTo", path: ["dateFrom"] },
+);
+
 export const validateAdminPayoutList = validateRequest({ query: payoutListQuerySchema });
 export const validateAdminPayoutId = validateRequest({ params: payoutIdParamsSchema });
 export const validateAdminOrderList = validateRequest({ query: orderListQuerySchema });
@@ -206,3 +248,10 @@ export const validateAdminMedicineUpdate = validateRequest({
     params: medicineIdParamsSchema,
     body: updateMedicineSchema,
 });
+export const validateAdminAppointmentList = validateRequest({
+    query: appointmentListAdminQuerySchema,
+});
+export const validateAdminAppointmentId = validateRequest({
+    params: appointmentIdAdminParamsSchema,
+});
+export const validateAdminAuditLogList = validateRequest({ query: auditLogListQuerySchema });

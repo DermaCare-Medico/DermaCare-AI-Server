@@ -15,6 +15,8 @@ import type {
     AppointmentListQuery,
     CreateAppointmentInput,
 } from "../appointments.validation.js";
+import type { AdminAppointmentListQuery } from "../../admin/admin.validation.js";
+import { requireActiveAdmin } from "../../admin/services/admin.service.js";
 
 const httpError = (statusCode: number, message: string) => new AppError(message, statusCode);
 
@@ -239,8 +241,82 @@ const getMyAppointmentById = async (userId: string, appointmentId: string) => {
     return presentAppointment(appointment, true);
 };
 
+const adminAppointmentSelect = {
+    id: true,
+    status: true,
+    cancellationReason: true,
+    cancellationRequestedAt: true,
+    holdExpiresAt: true,
+    createdAt: true,
+    updatedAt: true,
+    patient: {
+        select: {
+            id: true,
+            user: { select: { id: true, name: true, email: true } },
+        },
+    },
+    doctor: {
+        select: {
+            id: true,
+            user: { select: { id: true, name: true, email: true } },
+            specialization: { select: { id: true, name: true } },
+        },
+    },
+    slot: { select: { id: true, startTime: true, endTime: true, status: true } },
+    payments: {
+        where: { purpose: "APPOINTMENT" as const },
+        select: { id: true, amount: true, currency: true, status: true, paidAt: true },
+        orderBy: { createdAt: "desc" as const },
+    },
+} satisfies Prisma.AppointmentSelect;
+
+const listAppointmentsForAdmin = async (
+    adminUserId: string,
+    query: AdminAppointmentListQuery,
+) => {
+    await requireActiveAdmin(adminUserId);
+    const where: Prisma.AppointmentWhereInput = {
+        ...(query.status && { status: query.status }),
+        ...(query.doctorId && { doctorId: query.doctorId }),
+        ...(query.patientId && { patientId: query.patientId }),
+    };
+
+    const [appointments, total] = await prisma.$transaction([
+        prisma.appointment.findMany({
+            where,
+            select: adminAppointmentSelect,
+            orderBy: { createdAt: "desc" },
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+        }),
+        prisma.appointment.count({ where }),
+    ]);
+
+    return {
+        appointments,
+        pagination: {
+            page: query.page,
+            limit: query.limit,
+            total,
+            totalPages: Math.ceil(total / query.limit),
+        },
+    };
+};
+
+const getAppointmentForAdmin = async (adminUserId: string, appointmentId: string) => {
+    await requireActiveAdmin(adminUserId);
+    const appointment = await prisma.appointment.findUnique({
+        where: { id: appointmentId },
+        select: adminAppointmentSelect,
+    });
+    if (!appointment) throw new AppError("Appointment not found", 404);
+    return appointment;
+};
+
 export const appointmentService = {
     createAppointment,
     getMyAppointments,
     getMyAppointmentById,
+    listAppointmentsForAdmin,
+    getAppointmentForAdmin,
 };
