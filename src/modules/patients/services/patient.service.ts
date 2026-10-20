@@ -1,12 +1,38 @@
 
 import { prisma } from "../../../lib/prisma.js";
+import {
+    AccountStatus,
+    AppointmentStatus,
+    Role,
+} from "../../../generated/prisma/client.js";
 import { UpdatePatientProfilePayload } from "../../../types/patients.types.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 
+const ensureActivePatient = async (userId: string) => {
+    const user = await prisma.user.findFirst({
+        where: {
+            id: userId,
+            role: Role.PATIENT,
+            status: AccountStatus.ACTIVE,
+            deletedAt: null,
+        },
+        select: { id: true },
+    });
+
+    if (!user) {
+        throw new AppError(
+            "Only active patients may access patient profiles",
+            HTTP_STATUS.FORBIDDEN,
+        );
+    }
+};
+
 
 //patient profile get api
 const getMyProfile = async (userId: string) => {
+    await ensureActivePatient(userId);
+
     const patient = await prisma.patientProfile.findUnique({
         where: {
             userId,
@@ -47,6 +73,8 @@ export const updateMyProfile = async (
     userId: string,
     payload: UpdatePatientProfilePayload
 ) => {
+    await ensureActivePatient(userId);
+
     // Find the logged-in patient's profile
     const patient = await prisma.patientProfile.findUnique({
         where: {
@@ -103,7 +131,116 @@ export const updateMyProfile = async (
     return updatedProfile;
 };
 
+const getMyDashboard = async (userId: string) => {
+    const user = await prisma.user.findFirst({
+        where: {
+            id: userId,
+            role: Role.PATIENT,
+            status: AccountStatus.ACTIVE,
+            deletedAt: null,
+        },
+        select: {
+            patientProfile: {
+                select: {
+                    screenings: {
+                        orderBy: { createdAt: "desc" },
+                        take: 1,
+                        select: {
+                            id: true,
+                            symptoms: true,
+                            riskLevel: true,
+                            redFlagDetected: true,
+                            aiStatus: true,
+                            createdAt: true,
+                        },
+                    },
+                    appointments: {
+                        where: {
+                            status: {
+                                in: [
+                                    AppointmentStatus.HELD,
+                                    AppointmentStatus.PENDING,
+                                    AppointmentStatus.CONFIRMED,
+                                    AppointmentStatus.CANCELLATION_REQUESTED,
+                                ],
+                            },
+                            slot: {
+                                startTime: { gt: new Date() },
+                            },
+                        },
+                        orderBy: {
+                            slot: { startTime: "asc" },
+                        },
+                        take: 3,
+                        select: {
+                            id: true,
+                            status: true,
+                            doctor: {
+                                select: {
+                                    id: true,
+                                    user: { select: { name: true } },
+                                    specialization: {
+                                        select: { id: true, name: true },
+                                    },
+                                },
+                            },
+                            slot: {
+                                select: {
+                                    id: true,
+                                    startTime: true,
+                                    endTime: true,
+                                },
+                            },
+                        },
+                    },
+                    orders: {
+                        orderBy: { createdAt: "desc" },
+                        take: 3,
+                        select: {
+                            id: true,
+                            status: true,
+                            totalAmount: true,
+                            createdAt: true,
+                            items: {
+                                select: {
+                                    medicineName: true,
+                                    quantity: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            _count: {
+                select: {
+                    notifications: {
+                        where: { isRead: false },
+                    },
+                },
+            },
+        },
+    });
+
+    if (!user) {
+        throw new AppError(
+            "Only active patients may access the patient dashboard",
+            HTTP_STATUS.FORBIDDEN,
+        );
+    }
+    if (!user.patientProfile) {
+        throw new AppError("Patient profile not found", HTTP_STATUS.NOT_FOUND);
+    }
+
+    return {
+        latestScreening: user.patientProfile.screenings[0] ?? null,
+        upcomingAppointments: user.patientProfile.appointments,
+        recentOrders: user.patientProfile.orders,
+        unreadNotificationCount: user._count.notifications,
+    };
+};
+
 export const patientService = {
     getMyProfile,
     updateMyProfile,
+    getMyDashboard,
 }
