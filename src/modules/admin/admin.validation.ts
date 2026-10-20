@@ -47,6 +47,21 @@ export type AdminDoctorListQuery = {
     status?: DoctorApprovalStatus;
 };
 
+export type AdminMedicineListQuery = {
+    page: number;
+    limit: number;
+    search?: string;
+    lowStock?: boolean;
+};
+
+export type CreateMedicineInput = {
+    name: string;
+    description?: string;
+    price: number;
+    stockQuantity: number;
+    requiresPrescription: boolean;
+};
+
 const paginationShape = {
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -116,6 +131,26 @@ const approveDoctorBodySchema = z.preprocess(
     z.object({}).strict(),
 );
 
+const rejectDoctorBodySchema = z.object({
+    reason: z.string().trim().min(3).max(1000),
+}).strict();
+
+const booleanQueryValue = z.enum(["true", "false"]).transform((value) => value === "true");
+
+const medicineListQuerySchema = z.object({
+    ...paginationShape,
+    search: z.string().trim().min(1).max(200).optional(),
+    lowStock: booleanQueryValue.optional(),
+}).strict();
+
+const createMedicineSchema = z.object({
+    name: z.string().trim().min(2).max(200),
+    description: z.string().trim().min(1).max(2000).optional(),
+    price: z.coerce.number().positive().max(99999999.99),
+    stockQuantity: z.coerce.number().int().min(0),
+    requiresPrescription: z.boolean(),
+}).strict();
+
 export const validateAdminPayoutList = validateRequest({ query: payoutListQuerySchema });
 export const validateAdminPayoutId = validateRequest({ params: payoutIdParamsSchema });
 export const validateAdminOrderList = validateRequest({ query: orderListQuerySchema });
@@ -139,3 +174,9 @@ export const validateAdminDoctorApproval = validateRequest({
     params: doctorIdParamsSchema,
     body: approveDoctorBodySchema,
 });
+export const validateAdminDoctorRejection = validateRequest({
+    params: doctorIdParamsSchema,
+    body: rejectDoctorBodySchema,
+});
+export const validateAdminMedicineList = validateRequest({ query: medicineListQuerySchema });
+export const validateAdminMedicineCreate = validateRequest({ body: createMedicineSchema });

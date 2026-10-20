@@ -149,8 +149,59 @@ const approveDoctor = async (adminUserId: string, doctorId: string) => {
     });
 };
 
+const rejectDoctor = async (adminUserId: string, doctorId: string, reason: string) => {
+    await requireActiveAdmin(adminUserId);
+
+    return prisma.$transaction(async (tx) => {
+        const doctor = await tx.doctorProfile.findUnique({
+            where: { id: doctorId },
+            select: { approvalStatus: true, userId: true },
+        });
+        if (!doctor) throw new AppError("Doctor approval request not found", 404);
+        if (doctor.approvalStatus !== DoctorApprovalStatus.PENDING) {
+            throw new AppError("Doctor approval request has already been reviewed", 409);
+        }
+
+        const updated = await tx.doctorProfile.updateMany({
+            where: { id: doctorId, approvalStatus: DoctorApprovalStatus.PENDING },
+            data: {
+                approvalStatus: DoctorApprovalStatus.REJECTED,
+                approvedById: adminUserId,
+                approvedAt: null,
+                rejectionReason: reason,
+            },
+        });
+        if (updated.count !== 1) {
+            throw new AppError("Doctor approval request has already been reviewed", 409);
+        }
+
+        await tx.user.update({
+            where: { id: doctor.userId },
+            data: { status: AccountStatus.REJECTED },
+        });
+        await tx.auditLog.create({
+            data: {
+                actorUserId: adminUserId,
+                action: "DOCTOR_REJECTED",
+                entityType: "DoctorProfile",
+                entityId: doctorId,
+                before: { approvalStatus: DoctorApprovalStatus.PENDING },
+                after: { approvalStatus: DoctorApprovalStatus.REJECTED },
+                metadata: { reason },
+            },
+        });
+
+        const rejected = await tx.doctorProfile.findUniqueOrThrow({
+            where: { id: doctorId },
+            select: doctorDetailsSelect,
+        });
+        return { ...rejected, documentReferences: [] as string[] };
+    });
+};
+
 export const doctorVerificationService = {
     getDoctor,
     listPendingApprovals,
     approveDoctor,
+    rejectDoctor,
 };

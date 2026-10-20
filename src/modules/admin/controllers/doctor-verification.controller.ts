@@ -51,8 +51,23 @@ const approveDoctor = async (req: Request, res: Response) => {
     });
 };
 
+const rejectDoctor = async (req: Request, res: Response) => {
+    const doctor = await doctorVerificationService.rejectDoctor(
+        getAdminUserId(req),
+        req.params.id!,
+        req.body.reason,
+    );
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Doctor verification rejected successfully",
+        data: doctor,
+    });
+};
+
 export const doctorVerificationController = {
     getDoctor,
     listPendingApprovals,
     approveDoctor,
+    rejectDoctor,
 };

@@ -6,6 +6,7 @@ import { doctorPayoutAdminController } from "./controllers/doctor-payout-admin.c
 import { userManagementController } from "./controllers/user-management.controller.js";
 import { doctorVerificationController } from "./controllers/doctor-verification.controller.js";
 import { orderController } from "../orders/controllers/order.controller.js";
+import { medicineController } from "../stores/controllers/medicine.controller.js";
 import {
     validateAdminOrderList,
     validateAdminOrderId,
@@ -14,6 +15,9 @@ import {
     validateAdminDoctorId,
     validateAdminDoctorApproval,
     validateAdminDoctorApprovalList,
+    validateAdminDoctorRejection,
+    validateAdminMedicineCreate,
+    validateAdminMedicineList,
     validateAdminPayoutId,
     validateAdminPayoutList,
     validateAdminUserList,
@@ -87,6 +91,21 @@ adminRouter.post(
     "/doctor-approvals/:id/approve",
     validateAdminDoctorApproval,
     asyncHandler(doctorVerificationController.approveDoctor),
+);
+adminRouter.post(
+    "/doctor-approvals/:id/reject",
+    validateAdminDoctorRejection,
+    asyncHandler(doctorVerificationController.rejectDoctor),
+);
+adminRouter.get(
+    "/medicines",
+    validateAdminMedicineList,
+    asyncHandler(medicineController.listMedicinesForAdmin),
+);
+adminRouter.post(
+    "/medicines",
+    validateAdminMedicineCreate,
+    asyncHandler(medicineController.createMedicineForAdmin),
 );
 
 export default adminRouter;
