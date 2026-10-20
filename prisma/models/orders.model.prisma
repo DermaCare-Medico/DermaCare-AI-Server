@@ -5,6 +5,7 @@ model Order {
   status          OrderStatus @default(PENDING)
   totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
   deliveryAddress String      @map("delivery_address")
+  paymentExpiresAt DateTime   @map("payment_expires_at") @db.Timestamp(6)
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamp(6)
 
@@ -16,6 +17,7 @@ model Order {
 
   @@index([patientId, createdAt])
   @@index([status])
+  @@index([status, paymentExpiresAt])
   @@index([prescriptionId])
   @@map("orders")
 }

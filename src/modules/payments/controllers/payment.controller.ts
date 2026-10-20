@@ -42,7 +42,35 @@ const getAppointmentPaymentController = async (req: Request, res: Response) => {
     });
 };
 
+const payForOrderController = async (req: Request, res: Response) => {
+    const payment = await paymentService.payForOrder(
+        getUserId(req),
+        req.params.id!,
+        req.body,
+    );
+    return res.status(HTTP_STATUS.CREATED).json({
+        success: true,
+        statusCode: HTTP_STATUS.CREATED,
+        message: "Order payment completed successfully",
+        data: payment,
+    });
+};
+
+const getOrderPaymentController = async (req: Request, res: Response) => {
+    const result = await paymentService.getOrderPayment(getUserId(req), req.params.id!);
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: result.payment
+            ? "Order payment retrieved successfully"
+            : "Order has not been paid",
+        data: result,
+    });
+};
+
 export const paymentController = {
     payForAppointmentController,
     getAppointmentPaymentController,
+    payForOrderController,
+    getOrderPaymentController,
 };

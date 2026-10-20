@@ -15,6 +15,10 @@ import type {
     CreateOrderInput,
     PatientOrderListQuery,
 } from "../orders.validation.js";
+import {
+    aggregateInventoryQuantities,
+    getOrderPaymentExpiry,
+} from "./order-payment.rules.js";
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -124,6 +128,7 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                 (total, item) => total.add(item.subtotal),
                 new Prisma.Decimal(0),
             );
+            const paymentExpiresAt = getOrderPaymentExpiry();
 
             return tx.order.create({
                 data: {
@@ -131,6 +136,7 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                     prescriptionId: input.prescriptionId,
                     deliveryAddress: input.deliveryAddress,
                     totalAmount,
+                    paymentExpiresAt,
                     items: { create: orderItems },
                 },
                 select: {
@@ -139,6 +145,7 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                     prescriptionId: true,
                     totalAmount: true,
                     deliveryAddress: true,
+                    paymentExpiresAt: true,
                     createdAt: true,
                     items: {
                         select: {
@@ -178,6 +185,7 @@ const listMyOrders = async (userId: string, query: PatientOrderListQuery) => {
                 status: true,
                 prescriptionId: true,
                 totalAmount: true,
+                paymentExpiresAt: true,
                 createdAt: true,
                 updatedAt: true,
                 _count: { select: { items: true } },
@@ -206,6 +214,7 @@ const getMyOrder = async (userId: string, orderId: string) => {
             status: true,
             prescriptionId: true,
             totalAmount: true,
+            paymentExpiresAt: true,
             deliveryAddress: true,
             createdAt: true,
             updatedAt: true,
@@ -272,6 +281,7 @@ const orderDetailsSelect = {
     status: true,
     totalAmount: true,
     deliveryAddress: true,
+    paymentExpiresAt: true,
     createdAt: true,
     updatedAt: true,
     patient: {
@@ -334,7 +344,16 @@ const updateOrderStatusForAdmin = async (
             where: { id: orderId },
             select: {
                 status: true,
+                totalAmount: true,
                 items: { select: { inventoryId: true, quantity: true } },
+                payments: {
+                    where: {
+                        purpose: "MEDICINE_ORDER",
+                        status: "PAID",
+                    },
+                    select: { id: true, amount: true, currency: true },
+                    take: 1,
+                },
             },
         });
         if (!existing) throw new AppError("Order not found", 404);
@@ -344,24 +363,28 @@ const updateOrderStatusForAdmin = async (
                 409,
             );
         }
+        const paidPayment = existing.payments[0];
+        if (input.status === OrderStatus.CONFIRMED
+            && (!paidPayment
+                || !paidPayment.amount.equals(existing.totalAmount)
+                || paidPayment.currency !== "BDT")) {
+            throw new AppError("Order must be paid in full before confirmation", 409);
+        }
 
         const updated = await tx.order.updateMany({
-            where: { id: orderId, status: existing.status },
+            where: {
+                id: orderId,
+                status: existing.status,
+                ...(input.status === OrderStatus.CONFIRMED && {
+                    payments: { some: { id: paidPayment!.id } },
+                }),
+            },
             data: { status: input.status },
         });
         if (updated.count !== 1) throw new AppError("Order status changed; please retry", 409);
 
         if (input.status === OrderStatus.CANCELLED) {
-            const quantitiesByInventory = existing.items.reduce<Map<string, number>>(
-                (quantities, item) => {
-                    quantities.set(
-                        item.inventoryId,
-                        (quantities.get(item.inventoryId) ?? 0) + item.quantity,
-                    );
-                    return quantities;
-                },
-                new Map(),
-            );
+            const quantitiesByInventory = aggregateInventoryQuantities(existing.items);
 
             for (const [inventoryId, quantity] of quantitiesByInventory) {
                 await tx.storeInventory.update({
@@ -390,6 +413,61 @@ const updateOrderStatusForAdmin = async (
     });
 };
 
+const cleanupExpiredUnpaidOrders = async (now = new Date(), batchSize = 100) => {
+    const candidates = await prisma.order.findMany({
+        where: {
+            status: OrderStatus.PENDING,
+            paymentExpiresAt: { lte: now },
+            payments: {
+                none: {
+                    purpose: "MEDICINE_ORDER",
+                    status: "PAID",
+                },
+            },
+        },
+        orderBy: { paymentExpiresAt: "asc" },
+        take: batchSize,
+        select: { id: true },
+    });
+
+    let cancelled = 0;
+    for (const candidate of candidates) {
+        const didCancel = await prisma.$transaction(async (tx) => {
+            const order = await tx.order.findUnique({
+                where: { id: candidate.id },
+                select: { items: { select: { inventoryId: true, quantity: true } } },
+            });
+            if (!order) return false;
+
+            const claimed = await tx.order.updateMany({
+                where: {
+                    id: candidate.id,
+                    status: OrderStatus.PENDING,
+                    paymentExpiresAt: { lte: now },
+                    payments: {
+                        none: {
+                            purpose: "MEDICINE_ORDER",
+                            status: "PAID",
+                        },
+                    },
+                },
+                data: { status: OrderStatus.CANCELLED },
+            });
+            if (claimed.count !== 1) return false;
+
+            for (const [inventoryId, quantity] of aggregateInventoryQuantities(order.items)) {
+                await tx.storeInventory.update({
+                    where: { id: inventoryId },
+                    data: { stockQuantity: { increment: quantity } },
+                });
+            }
+            return true;
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        if (didCancel) cancelled += 1;
+    }
+    return cancelled;
+};
+
 export const orderService = {
     createOrder,
     listMyOrders,
@@ -397,4 +475,5 @@ export const orderService = {
     listOrdersForAdmin,
     getOrderForAdmin,
     updateOrderStatusForAdmin,
+    cleanupExpiredUnpaidOrders,
 };
