@@ -1,5 +1,4 @@
 
-import { unlink } from "node:fs/promises";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import {
@@ -62,5 +61,5 @@ export async function saveScreeningImage(
     }
 
     throw error;
-  } 
+  }
 }
