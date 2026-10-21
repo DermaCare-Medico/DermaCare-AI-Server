@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test:orders": "tsx --test src/modules/orders/services/*.test.ts",
     "test:auth:integration": "tsx --test src/modules/auth/services/auth-otp.integration.test.ts",
+    "test:payments:integration": "tsx --test src/modules/payments/services/payments-orders.integration.test.ts",
     "test:meetings": "tsx --test src/integrations/google-calendar/*.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
