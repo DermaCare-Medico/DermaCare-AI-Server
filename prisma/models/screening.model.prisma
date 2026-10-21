@@ -31,19 +31,19 @@ model ScreeningImage {
 }
 
 model Condition {
-  id               String                @id @default(uuid()) @db.Uuid
-  specializationId String?               @map("specialization_id") @db.Uuid
-  name             String                @unique @db.VarChar(150)
+  id               String                    @id @default(uuid()) @db.Uuid
+  specializationId String?                   @map("specialization_id") @db.Uuid
+  name             String                    @unique @db.VarChar(150)
   overview         String
-  symptoms         String[]              @default([])
-  naturalCare      String?               @map("natural_care")
-  warningSigns     String[]              @default([]) @map("warning_signs")
+  symptoms         String[]                  @default([])
+  naturalCare      String?                   @map("natural_care")
+  warningSigns     String[]                  @default([]) @map("warning_signs")
   prevention       String?
-  riskCategory     RiskCategory          @map("risk_category")
-  safeForHomeCare  Boolean               @default(false) @map("safe_for_home_care")
-  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamp(6)
-  specialization   Specialization?       @relation(fields: [specializationId], references: [id])
+  riskCategory     RiskCategory              @map("risk_category")
+  safeForHomeCare  Boolean                   @default(false) @map("safe_for_home_care")
+  createdAt        DateTime                  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime                  @updatedAt @map("updated_at") @db.Timestamp(6)
+  specializations  ConditionSpecialization[]
   predictions      ScreeningPrediction[]
 
   @@index([specializationId])

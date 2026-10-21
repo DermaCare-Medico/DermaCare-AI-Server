@@ -13,6 +13,8 @@ import userRoutes from "../modules/user/user.module.js";
 import storeRoutes from "../modules/stores/stores.routes.js";
 import orderRoutes from "../modules/orders/orders.routes.js";
 
+import screeningRoutes from "../modules/screenings/screenings.routes.js";
+
 // Every module router is mounted here, so app.ts never changes when a module is added
 const apiRouter = Router();
 
@@ -54,5 +56,9 @@ apiRouter.use(
   orderRoutes,
   doctorRoutes,
 );
+
+apiRouter.use("/screenings", screeningRoutes);
+
+apiRouter.use("/api/doctors", doctorRoutes);
 
 export default apiRouter;
