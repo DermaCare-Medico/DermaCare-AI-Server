@@ -3,11 +3,11 @@ import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { AUTH_OTP } from "../../../shared/constants/auth.constants.js";
 import { sendOtpEmail } from "../../../shared/services/email.service.js";
-import { Prisma } from "../../../generated/prisma/client.js";
-import type { Role } from "../../../generated/prisma/client.js";
+import { AccountStatus, NotificationType, Prisma, Role } from "../../../generated/prisma/client.js";
 import type { RegisterPayload, RegisterRole, RequestMeta } from "../../../types/auth.types.js";
 import { otpService } from "./otp.service.js";
 import { issueSession } from "./token.service.js";
+import { createNotification } from "../../notifications/services/notification.service.js";
 
 export const userSelect = {
   id: true,
@@ -81,6 +81,7 @@ export const createAccount = async (input: {
   identity:
     | { provider: "PASSWORD"; passwordHash: string }
     | { provider: "GOOGLE"; sub: string };
+  notifyAdminsOfDoctorRegistration?: boolean;
 }): Promise<DbUser> => {
   try {
     return await prisma.$transaction(async (tx) => {
@@ -119,6 +120,28 @@ export const createAccount = async (input: {
       // a Patient is active immediately; a Doctor adds license details later
       if (input.role === "PATIENT") {
         await tx.patientProfile.create({ data: { userId: user.id } });
+      }
+
+      if (input.role === "DOCTOR" && input.notifyAdminsOfDoctorRegistration) {
+        const admins = await tx.user.findMany({
+          where: {
+            role: Role.ADMIN,
+            status: AccountStatus.ACTIVE,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+
+        for (const admin of admins) {
+          await createNotification({
+            userId: admin.id,
+            title: "New doctor registration",
+            message: "A new doctor account has completed registration.",
+            notificationType: NotificationType.ACCOUNT,
+            relatedEntityType: "User",
+            relatedEntityId: user.id,
+          }, tx);
+        }
       }
 
       return user;
