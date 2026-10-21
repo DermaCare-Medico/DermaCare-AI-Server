@@ -1,10 +1,19 @@
+import "dotenv/config";
 
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { AUTH_OTP } from "../../../shared/constants/auth.constants.js";
 import { sendOtpEmail } from "../../../shared/services/email.service.js";
-import { AccountStatus, NotificationType, Prisma, Role } from "../../../generated/prisma/client.js";
-import type { RegisterPayload, RegisterRole, RequestMeta } from "../../../types/auth.types.js";
+import {
+  AccountStatus,
+  NotificationType,
+  Prisma,
+  Role,
+} from "../../../generated/prisma/client.js";
+import type {
+  RegisterRole,
+  RequestMeta,
+} from "../../../types/auth.types.js";
 import { otpService } from "./otp.service.js";
 import { issueSession } from "./token.service.js";
 import { createNotification } from "../../notifications/services/notification.service.js";
@@ -42,9 +51,12 @@ export const isUniqueViolation = (e: unknown): boolean =>
   e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
 
 export const assertActive = (user: DbUser): void => {
-  if (user.deletedAt) throw new AppError("Invalid email or password", 401);
-  if (user.status === "SUSPENDED") {
-    throw new AppError("Your account is suspended", 403);
+  if (user.deletedAt) {
+    throw new AppError("Invalid email or password", 401);
+  }
+
+  if (user.status !== AccountStatus.ACTIVE) {
+    throw new AppError("Your account is not active", 403);
   }
 };
 
@@ -52,7 +64,7 @@ export const assertActive = (user: DbUser): void => {
 export const doctorStatusOf = async (
   user: DbUser,
 ): Promise<string | undefined> => {
-  if (user.role !== "DOCTOR") return undefined;
+  if (user.role !== Role.DOCTOR) return undefined;
 
   const profile = await prisma.doctorProfile.findUnique({
     where: { userId: user.id },
@@ -117,12 +129,17 @@ export const createAccount = async (input: {
               },
       });
 
-      // a Patient is active immediately; a Doctor adds license details later
-      if (input.role === "PATIENT") {
-        await tx.patientProfile.create({ data: { userId: user.id } });
+      // A Patient is active immediately; a Doctor adds license details later
+      if (input.role === Role.PATIENT) {
+        await tx.patientProfile.create({
+          data: { userId: user.id },
+        });
       }
 
-      if (input.role === "DOCTOR" && input.notifyAdminsOfDoctorRegistration) {
+      if (
+        input.role === Role.DOCTOR &&
+        input.notifyAdminsOfDoctorRegistration
+      ) {
         const admins = await tx.user.findMany({
           where: {
             role: Role.ADMIN,
@@ -133,14 +150,17 @@ export const createAccount = async (input: {
         });
 
         for (const admin of admins) {
-          await createNotification({
-            userId: admin.id,
-            title: "New doctor registration",
-            message: "A new doctor account has completed registration.",
-            notificationType: NotificationType.ACCOUNT,
-            relatedEntityType: "User",
-            relatedEntityId: user.id,
-          }, tx);
+          await createNotification(
+            {
+              userId: admin.id,
+              title: "New doctor registration",
+              message: "A new doctor account has completed registration.",
+              notificationType: NotificationType.ACCOUNT,
+              relatedEntityType: "User",
+              relatedEntityId: user.id,
+            },
+            tx,
+          );
         }
       }
 
@@ -150,6 +170,7 @@ export const createAccount = async (input: {
     if (isUniqueViolation(e)) {
       throw new AppError("An account with this email already exists", 409);
     }
+
     throw e;
   }
 };
@@ -159,12 +180,21 @@ export const sendCode = async (
   purpose: "EMAIL_VERIFICATION" | "PASSWORD_RESET",
   payload?: Prisma.InputJsonValue,
 ): Promise<void> => {
-  const { id, code } = await otpService.issue({ email, purpose, payload });
+  const { id, code } = await otpService.issue({
+    email,
+    purpose,
+    payload,
+  });
 
   try {
     await sendOtpEmail(email, code, purpose);
   } catch (e) {
-    await otpService.discard(id);
+    try {
+      await otpService.discard(id);
+    } catch (discardError) {
+      console.error("[sendCode] Failed to discard OTP", discardError);
+    }
+
     throw e;
   }
 };

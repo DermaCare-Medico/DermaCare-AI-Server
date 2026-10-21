@@ -8,21 +8,24 @@ import {
 } from "../auth.validation.js";
 
 export const passwordController = {
-  requestOtp: asyncHandler(async (req, res) => {
-    const { email } = parse(emailOnlySchema, req.body);
-    const data = await passwordResetService.requestPasswordResetOtp(email);
+ 
+requestOtp: asyncHandler(async (req, res) => {
 
-    res.status(200).json({
-      success: true,
-      message: "If this email is registered, a code was sent",
-      data,
-    });
-  }),
+  const { email } = parse(emailOnlySchema, req.body);
+
+  const data = await passwordResetService.requestPasswordResetOtp(email);
+
+  res.status(200).json({
+    success: true,
+    message: "If this email is registered, a code was sent",
+    data,
+  });
+}),
+
 
   verifyOtp: asyncHandler(async (req, res) => {
     const body = parse(verifyOtpSchema, req.body);
     const data = await passwordResetService.checkPasswordResetOtp(body);
-
     res.status(200).json({ success: true, data });
   }),
 

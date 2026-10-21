@@ -1,35 +1,32 @@
 model Prescription {
-  id            String    @id @default(uuid()) @db.Uuid
-  appointmentId String    @unique @map("appointment_id") @db.Uuid
-  doctorId      String    @map("doctor_id") @db.Uuid
+  id            String             @id @default(uuid()) @db.Uuid
+  appointmentId String             @unique @map("appointment_id") @db.Uuid
+  doctorId      String             @map("doctor_id") @db.Uuid
   findings      String?
   advice        String?
-  followUp      String?   @map("follow_up")
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-  sentAt        DateTime? @map("sent_at") @db.Timestamp(6)
-
-  appointment Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
-  doctor      DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Restrict)
-
-  items  PrescriptionItem[]
-  orders Order[]
+  followUp      String?            @map("follow_up")
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamp(6)
+  sentAt        DateTime?          @map("sent_at") @db.Timestamp(6)
+  orders        Order[]
+  items         PrescriptionItem[]
+  appointment   Appointment        @relation(fields: [appointmentId], references: [id])
+  doctor        DoctorProfile      @relation(fields: [doctorId], references: [id])
 
   @@index([doctorId])
   @@map("prescriptions")
 }
 
 model PrescriptionItem {
-  id             String  @id @default(uuid()) @db.Uuid
-  prescriptionId String  @map("prescription_id") @db.Uuid
-  medicineId     String  @map("medicine_id") @db.Uuid
-  medicineName   String  @map("medicine_name") @db.VarChar(255)
-  dosage         String  @db.VarChar(100)
-  frequency      String  @db.VarChar(100)
-  duration       String  @db.VarChar(100)
+  id             String       @id @default(uuid()) @db.Uuid
+  prescriptionId String       @map("prescription_id") @db.Uuid
+  medicineId     String       @map("medicine_id") @db.Uuid
+  medicineName   String       @map("medicine_name") @db.VarChar(255)
+  dosage         String       @db.VarChar(100)
+  frequency      String       @db.VarChar(100)
+  duration       String       @db.VarChar(100)
   instructions   String?
-
-  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
-  medicine     Medicine     @relation(fields: [medicineId], references: [id], onDelete: Restrict)
+  medicine       Medicine     @relation(fields: [medicineId], references: [id])
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
 
   @@index([prescriptionId])
   @@index([medicineId])
@@ -46,12 +43,10 @@ model Conversation {
   closesAt      DateTime?          @map("closes_at") @db.Timestamp(6)
   closedAt      DateTime?          @map("closed_at") @db.Timestamp(6)
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamp(6)
-
-  appointment Appointment    @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
-  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  doctor      DoctorProfile  @relation(fields: [doctorId], references: [id], onDelete: Restrict)
-
-  messages Message[]
+  appointment   Appointment        @relation(fields: [appointmentId], references: [id])
+  doctor        DoctorProfile      @relation(fields: [doctorId], references: [id])
+  patient       PatientProfile     @relation(fields: [patientId], references: [id])
+  messages      Message[]
 
   @@index([patientId])
   @@index([doctorId])
@@ -60,15 +55,14 @@ model Conversation {
 }
 
 model Message {
-  id             String    @id @default(uuid()) @db.Uuid
-  conversationId String    @map("conversation_id") @db.Uuid
-  senderId       String    @map("sender_id") @db.Uuid
-  messageText    String    @map("message_text")
-  sentAt         DateTime  @default(now()) @map("sent_at") @db.Timestamp(6)
-  readAt         DateTime? @map("read_at") @db.Timestamp(6)
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
-  sender       User         @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @map("conversation_id") @db.Uuid
+  senderId       String       @map("sender_id") @db.Uuid
+  messageText    String       @map("message_text")
+  sentAt         DateTime     @default(now()) @map("sent_at") @db.Timestamp(6)
+  readAt         DateTime?    @map("read_at") @db.Timestamp(6)
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         User         @relation(fields: [senderId], references: [id])
 
   @@index([conversationId, sentAt])
   @@index([senderId])

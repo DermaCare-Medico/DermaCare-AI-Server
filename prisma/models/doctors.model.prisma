@@ -1,11 +1,10 @@
 model Specialization {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique @db.VarChar(150)
+  id          String          @id @default(uuid()) @db.Uuid
+  name        String          @unique @db.VarChar(150)
   description String?
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-
-  doctors    DoctorProfile[]
-  conditions Condition[]
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
+  conditions  Condition[]
+  doctors     DoctorProfile[]
 
   @@map("specializations")
 }
@@ -28,17 +27,16 @@ model DoctorProfile {
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  user           User           @relation("DoctorUser", fields: [userId], references: [id], onDelete: Restrict)
-  specialization Specialization @relation(fields: [specializationId], references: [id], onDelete: Restrict)
-  approvedBy     User?          @relation("DoctorApprover", fields: [approvedById], references: [id], onDelete: SetNull)
-
-  slots            DoctorSlot[]
   appointments     Appointment[]
-  prescriptions    Prescription[]
   conversations    Conversation[]
-  medicineRequests MedicineRequest[]
   payouts          DoctorPayout[]
+  approvedBy       User?                @relation("DoctorApprover", fields: [approvedById], references: [id])
+  specialization   Specialization       @relation(fields: [specializationId], references: [id])
+  user             User                 @relation("DoctorUser", fields: [userId], references: [id])
   reviews          DoctorReview[]
+  slots            DoctorSlot[]
+  medicineRequests MedicineRequest[]
+  prescriptions    Prescription[]
 
   @@index([specializationId])
   @@index([approvalStatus])
@@ -46,16 +44,15 @@ model DoctorProfile {
 }
 
 model DoctorSlot {
-  id        String     @id @default(uuid()) @db.Uuid
-  doctorId  String     @map("doctor_id") @db.Uuid
-  startTime DateTime   @map("start_time") @db.Timestamp(6)
-  endTime   DateTime   @map("end_time") @db.Timestamp(6)
-  status    SlotStatus @default(AVAILABLE)
-  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamp(6)
-
-  doctor       DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  id           String        @id @default(uuid()) @db.Uuid
+  doctorId     String        @map("doctor_id") @db.Uuid
+  startTime    DateTime      @map("start_time") @db.Timestamp(6)
+  endTime      DateTime      @map("end_time") @db.Timestamp(6)
+  status       SlotStatus    @default(AVAILABLE)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamp(6)
   appointments Appointment[]
+  doctor       DoctorProfile @relation(fields: [doctorId], references: [id])
 
   @@unique([id, doctorId])
   @@index([doctorId, startTime])
@@ -64,20 +61,20 @@ model DoctorSlot {
 }
 
 model DoctorPayout {
-  id                   String       @id @default(uuid()) @db.Uuid
-  doctorId             String       @map("doctor_id") @db.Uuid
-  periodStart          DateTime     @map("period_start") @db.Date
-  periodEnd            DateTime     @map("period_end") @db.Date
-  totalConsultations   Int          @default(0) @map("total_consultations")
-  grossAmount          Decimal      @map("gross_amount") @db.Decimal(10, 2)
-  platformFee          Decimal      @default(0) @map("platform_fee") @db.Decimal(10, 2)
-  netAmount            Decimal      @map("net_amount") @db.Decimal(10, 2)
-  status               PayoutStatus @default(PENDING)
-  paidAt               DateTime?    @map("paid_at") @db.Timestamp(6)
-  transactionReference String?      @map("transaction_reference") @db.VarChar(255)
+  id                   String        @id @default(uuid()) @db.Uuid
+  doctorId             String        @map("doctor_id") @db.Uuid
+  periodStart          DateTime      @map("period_start") @db.Date
+  periodEnd            DateTime      @map("period_end") @db.Date
+  totalConsultations   Int           @default(0) @map("total_consultations")
+  grossAmount          Decimal       @map("gross_amount") @db.Decimal(10, 2)
+  platformFee          Decimal       @default(0) @map("platform_fee") @db.Decimal(10, 2)
+  netAmount            Decimal       @map("net_amount") @db.Decimal(10, 2)
+  status               PayoutStatus  @default(PENDING)
+  paidAt               DateTime?     @map("paid_at") @db.Timestamp(6)
+  transactionReference String?       @map("transaction_reference") @db.VarChar(255)
   notes                String?
-  createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamp(6)
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamp(6)
 
   doctor DoctorProfile      @relation(fields: [doctorId], references: [id], onDelete: Restrict)
   items  DoctorPayoutItem[]
@@ -104,18 +101,17 @@ model DoctorPayoutItem {
 }
 
 model DoctorReview {
-  id            String   @id @default(uuid()) @db.Uuid
-  appointmentId String   @unique @map("appointment_id") @db.Uuid
-  patientId     String   @map("patient_id") @db.Uuid
-  doctorId      String   @map("doctor_id") @db.Uuid
+  id            String         @id @default(uuid()) @db.Uuid
+  appointmentId String         @unique @map("appointment_id") @db.Uuid
+  patientId     String         @map("patient_id") @db.Uuid
+  doctorId      String         @map("doctor_id") @db.Uuid
   rating        Int
-  reviewText    String?  @map("review_text")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
-
-  appointment Appointment    @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
-  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  doctor      DoctorProfile  @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  reviewText    String?        @map("review_text")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamp(6)
+  appointment   Appointment    @relation(fields: [appointmentId], references: [id])
+  doctor        DoctorProfile  @relation(fields: [doctorId], references: [id])
+  patient       PatientProfile @relation(fields: [patientId], references: [id])
 
   @@index([doctorId, createdAt])
   @@index([patientId])

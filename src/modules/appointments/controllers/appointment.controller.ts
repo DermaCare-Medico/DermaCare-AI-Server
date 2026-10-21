@@ -1,3 +1,4 @@
+
 import type { Request, Response } from "express";
 
 import { AppointmentStatus } from "../../../generated/prisma/enums.js";
@@ -7,14 +8,19 @@ import { appointmentService } from "../services/appointment.service.js";
 
 const getUserId = (req: Request) => {
     const userId = req.auth?.userId;
+
     if (!userId) {
         throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
     }
+
     return userId;
 };
 
 const createAppointmentController = async (req: Request, res: Response) => {
-    const appointment = await appointmentService.createAppointment(getUserId(req), req.body);
+    const appointment = await appointmentService.createAppointment(
+        getUserId(req),
+        req.body,
+    );
 
     return res.status(HTTP_STATUS.CREATED).json({
         success: true,
@@ -65,13 +71,16 @@ const getDoctorAppointmentByIdController = async (req: Request, res: Response) =
 };
 
 const listAppointmentsForAdmin = async (req: Request, res: Response) => {
-    const result = await appointmentService.listAppointmentsForAdmin(getUserId(req), {
-        page: Number(req.query.page),
-        limit: Number(req.query.limit),
-        status: req.query.status as AppointmentStatus | undefined,
-        doctorId: req.query.doctorId as string | undefined,
-        patientId: req.query.patientId as string | undefined,
-    });
+    const result = await appointmentService.listAppointmentsForAdmin(
+        getUserId(req),
+        {
+            page: Number(req.query.page),
+            limit: Number(req.query.limit),
+            status: req.query.status as AppointmentStatus | undefined,
+            doctorId: req.query.doctorId as string | undefined,
+            patientId: req.query.patientId as string | undefined,
+        },
+    );
 
     return res.status(HTTP_STATUS.OK).json({
         success: true,
@@ -87,6 +96,7 @@ const getAppointmentForAdmin = async (req: Request, res: Response) => {
         getUserId(req),
         req.params.id!,
     );
+
     return res.status(HTTP_STATUS.OK).json({
         success: true,
         statusCode: HTTP_STATUS.OK,

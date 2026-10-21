@@ -10,21 +10,29 @@ model User {
   createdAt                DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt                DateTime          @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt                DateTime?         @map("deleted_at") @db.Timestamp(6)
+
+  // Consent Information
+  consentVersion           String?           @map("consent_version") @db.VarChar(20)
+  healthConsentAcceptedAt  DateTime?         @map("health_consent_accepted_at") @db.Timestamp(6)
+  privacyAcceptedAt        DateTime?         @map("privacy_accepted_at") @db.Timestamp(6)
+  termsAcceptedAt          DateTime?         @map("terms_accepted_at") @db.Timestamp(6)
+
+  // Authentication
   refreshTokens            RefreshToken[]
   authIdentities           AuthIdentity[]
+
+  // Profiles
   patientProfile           PatientProfile?
-  adminProfile             Admin?
   doctorProfile            DoctorProfile?    @relation("DoctorUser")
+  adminProfile             Admin?
+
+  // Relationships
+  auditLogs                AuditLog[]
   approvedDoctors          DoctorProfile[]   @relation("DoctorApprover")
-  verifiedMedicines        Medicine[]        @relation("MedicineVerifier")
   reviewedMedicineRequests MedicineRequest[] @relation("MedicineRequestReviewer")
+  verifiedMedicines        Medicine[]        @relation("MedicineVerifier")
   messages                 Message[]
   notifications            Notification[]
-  auditLogs                AuditLog[]
-  termsAcceptedAt          DateTime?         @map("terms_accepted_at") @db.Timestamp(6)
-  privacyAcceptedAt        DateTime?         @map("privacy_accepted_at") @db.Timestamp(6)
-  healthConsentAcceptedAt  DateTime?         @map("health_consent_accepted_at") @db.Timestamp(6)
-  consentVersion           String?           @map("consent_version") @db.VarChar(20)
 
   @@index([role, status])
   @@index([deletedAt])
