@@ -60,6 +60,16 @@ const getMyAppointmentByIdController = async (req: Request, res: Response) => {
     });
 };
 
+const getDoctorAppointmentByIdController = async (req: Request, res: Response) => {
+    const appointment = await appointmentService.getDoctorAppointmentById(getUserId(req), req.params.id!);
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Appointment retrieved successfully",
+        data: appointment,
+    });
+};
+
 const listAppointmentsForAdmin = async (req: Request, res: Response) => {
     const result = await appointmentService.listAppointmentsForAdmin(
         getUserId(req),
@@ -99,6 +109,7 @@ export const appointmentController = {
     createAppointmentController,
     getMyAppointmentsController,
     getMyAppointmentByIdController,
+    getDoctorAppointmentByIdController,
     listAppointmentsForAdmin,
     getAppointmentForAdmin,
 };

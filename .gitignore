@@ -10,3 +10,6 @@ model/**/*.onnx
 model/**/*.pt
 model/**/*.safetensors
 src/generated
+.env
+.env.*
+!.env.example

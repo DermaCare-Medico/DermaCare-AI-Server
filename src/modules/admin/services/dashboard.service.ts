@@ -21,10 +21,31 @@ const getDashboard = async (userId: string) => {
 
     const [patients, doctors, pendingDoctorApprovals, appointments, orders] =
         await prisma.$transaction([
-            prisma.patientProfile.count(),
-            prisma.doctorProfile.count(),
+            prisma.user.count({
+                where: {
+                    role: Role.PATIENT,
+                    status: AccountStatus.ACTIVE,
+                    deletedAt: null,
+                    patientProfile: { isNot: null },
+                },
+            }),
             prisma.doctorProfile.count({
-                where: { approvalStatus: DoctorApprovalStatus.PENDING },
+                where: {
+                    approvalStatus: DoctorApprovalStatus.APPROVED,
+                    user: {
+                        status: AccountStatus.ACTIVE,
+                        deletedAt: null,
+                    },
+                },
+            }),
+            prisma.doctorProfile.count({
+                where: {
+                    approvalStatus: DoctorApprovalStatus.PENDING,
+                    user: {
+                        status: { in: [AccountStatus.ACTIVE, AccountStatus.PENDING] },
+                        deletedAt: null,
+                    },
+                },
             }),
             prisma.appointment.count(),
             prisma.order.count(),

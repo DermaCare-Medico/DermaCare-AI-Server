@@ -12,9 +12,10 @@ model PaymentTransaction {
   paidAt                DateTime?          @map("paid_at") @db.Timestamp(6)
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamp(6)
-  appointment           Appointment?       @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
-  order                 Order?             @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  patient               PatientProfile     @relation(fields: [patientId], references: [id])
+
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  appointment Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  order       Order?         @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@index([patientId, createdAt])
   @@index([appointmentId])

@@ -45,9 +45,13 @@ apiRouter.use(
 );
 apiRouter.use(
   authenticate,
+  authorize(Role.PATIENT, Role.DOCTOR),
+  appointmentRoutes,
+);
+apiRouter.use(
+  authenticate,
   authorize(Role.PATIENT),
   patientRoutes,
-  appointmentRoutes,
   paymentRoutes,
   orderRoutes,
   doctorRoutes,

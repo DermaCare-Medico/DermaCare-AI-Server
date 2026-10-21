@@ -3,10 +3,12 @@ import {
     DoctorApprovalStatus,
     Prisma,
     Role,
+    NotificationType,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { requireActiveAdmin } from "./admin.service.js";
+import { createNotification } from "../../notifications/services/notification.service.js";
 
 const doctorDetailsSelect = {
     id: true,
@@ -141,6 +143,15 @@ const approveDoctor = async (adminUserId: string, doctorId: string) => {
             },
         });
 
+        await createNotification({
+            userId: doctor.userId,
+            title: "Doctor account approved",
+            message: "Your doctor account has been approved.",
+            notificationType: NotificationType.ACCOUNT,
+            relatedEntityType: "DoctorProfile",
+            relatedEntityId: doctorId,
+        }, tx);
+
         const approved = await tx.doctorProfile.findUniqueOrThrow({
             where: { id: doctorId },
             select: doctorDetailsSelect,
@@ -175,10 +186,6 @@ const rejectDoctor = async (adminUserId: string, doctorId: string, reason: strin
             throw new AppError("Doctor approval request has already been reviewed", 409);
         }
 
-        await tx.user.update({
-            where: { id: doctor.userId },
-            data: { status: AccountStatus.REJECTED },
-        });
         await tx.auditLog.create({
             data: {
                 actorUserId: adminUserId,
@@ -189,6 +196,19 @@ const rejectDoctor = async (adminUserId: string, doctorId: string, reason: strin
                 after: { approvalStatus: DoctorApprovalStatus.REJECTED },
                 metadata: { reason },
             },
+        });
+
+        await createNotification({
+            userId: doctor.userId,
+            title: "Doctor account review completed",
+            message: "Your doctor account application was not approved.",
+            notificationType: NotificationType.ACCOUNT,
+            relatedEntityType: "DoctorProfile",
+            relatedEntityId: doctorId,
+        }, tx);
+        await tx.user.update({
+            where: { id: doctor.userId },
+            data: { status: AccountStatus.REJECTED },
         });
 
         const rejected = await tx.doctorProfile.findUniqueOrThrow({

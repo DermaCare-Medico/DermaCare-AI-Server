@@ -85,6 +85,7 @@ export const registrationService = {
         provider: "PASSWORD",
         passwordHash: payload.passwordHash,
       },
+      notifyAdminsOfDoctorRegistration: payload.role === "DOCTOR",
     });
 
     return startSession(user, meta);

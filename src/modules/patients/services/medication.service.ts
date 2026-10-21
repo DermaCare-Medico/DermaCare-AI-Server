@@ -39,6 +39,29 @@ const getActivePatientProfile = async (userId: string) => {
     return user.patientProfile;
 };
 
+const listMyMedications = async (userId: string) => {
+    const patient = await getActivePatientProfile(userId);
+
+    return prisma.currentMedication.findMany({
+        where: {
+            patientId: patient.id,
+            isActive: true,
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+            id: true,
+            medicineName: true,
+            dosage: true,
+            frequency: true,
+            startDate: true,
+            endDate: true,
+            notes: true,
+            createdAt: true,
+            updatedAt: true,
+        },
+    });
+};
+
 const createMyMedication = async (
     userId: string,
     payload: CreateMedicationInput,
@@ -161,6 +184,7 @@ const deactivateMyMedication = async (
 };
 
 export const medicationService = {
+    listMyMedications,
     createMyMedication,
     updateMyMedication,
     deactivateMyMedication,

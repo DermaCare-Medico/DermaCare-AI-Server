@@ -12,6 +12,24 @@ const getUserId = (req: Request) => {
     return userId;
 };
 
+const listMyPrescriptionsController = async (req: Request, res: Response) => {
+    const result = await prescriptionService.listPatientPrescriptions(
+        getUserId(req),
+        {
+            page: Number(req.query.page),
+            limit: Number(req.query.limit),
+        },
+    );
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Prescriptions retrieved successfully",
+        data: result.prescriptions,
+        pagination: result.pagination,
+    });
+};
+
 const getMyPrescriptionByIdController = async (req: Request, res: Response) => {
     const prescription = await prescriptionService.getPatientPrescriptionById(
         getUserId(req),
@@ -27,5 +45,6 @@ const getMyPrescriptionByIdController = async (req: Request, res: Response) => {
 };
 
 export const prescriptionController = {
+    listMyPrescriptionsController,
     getMyPrescriptionByIdController,
 };

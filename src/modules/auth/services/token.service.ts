@@ -4,7 +4,7 @@ import { env } from "../../../config/env.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { AUTH_TOKEN } from "../../../shared/constants/auth.constants.js";
-import { Role } from "../../../generated/prisma/client.js";
+import { AccountStatus, Role } from "../../../generated/prisma/client.js";
 import type { RequestMeta, SessionTokens } from "../../../types/auth.types.js";
 
 const hashToken = (token: string): string =>
@@ -39,6 +39,28 @@ export const verifyAccessToken = (token: string): { userId: string; role: Role }
     throw new AppError("Invalid token", 401);
   }
   return { userId: payload.sub, role: payload.role };
+};
+
+type AccessTokenClaims = ReturnType<typeof verifyAccessToken>;
+type CurrentAccount = { id: string; role: Role; status: AccountStatus; deletedAt: Date | null } | null;
+
+export const resolveAccessTokenAccount = async (
+  claims: AccessTokenClaims,
+  findAccount: (userId: string) => Promise<CurrentAccount> = async (userId) =>
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, status: true, deletedAt: true },
+    }),
+): Promise<AccessTokenClaims> => {
+  const account = await findAccount(claims.userId);
+  if (!account || account.deletedAt) {
+    throw new AppError("Invalid or expired token", 401);
+  }
+  if (account.status !== AccountStatus.ACTIVE) {
+    throw new AppError("Account is not active", 403);
+  }
+
+  return { userId: account.id, role: account.role };
 };
 
 export const issueSession = async (
@@ -95,7 +117,11 @@ export const rotateSession = async (
     throw new AppError("Refresh token expired", 401);
   }
 
-  if (record.user.deletedAt || record.user.status === "SUSPENDED") {
+  if (record.user.deletedAt) {
+    throw new AppError("Invalid refresh token", 401);
+  }
+
+  if (record.user.status !== AccountStatus.ACTIVE) {
     throw new AppError("Account is not active", 403);
   }
 

@@ -1,6 +1,6 @@
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
-export type UserRole = 'PATIENT' | 'DOCTOR' | 'ADMIN' | 'PUBLIC';
+export type UserRole = 'PATIENT' | 'DOCTOR' | 'ADMIN' | 'STORE_OWNER' | 'PUBLIC';
 
 export type ImplementationStatus =
   | 'Implemented and verified'

@@ -1,30 +1,41 @@
 model Appointment {
-  id                      String               @id @default(uuid()) @db.Uuid
-  patientId               String               @map("patient_id") @db.Uuid
-  doctorId                String               @map("doctor_id") @db.Uuid
-  slotId                  String               @unique(map: "appointments_one_active_per_slot", where: raw("(status <> 'CANCELLED'::appointment_status)")) @map("slot_id") @db.Uuid
-  screeningId             String?              @map("screening_id") @db.Uuid
-  status                  AppointmentStatus    @default(HELD)
-  videoLink               String?              @map("video_link")
-  historySharingConsent   Boolean              @default(false) @map("history_sharing_consent")
-  cancellationReason      String?              @map("cancellation_reason")
-  cancellationRequestedAt DateTime?            @map("cancellation_requested_at") @db.Timestamp(6)
-  holdExpiresAt           DateTime?            @map("hold_expires_at") @db.Timestamp(6)
-  createdAt               DateTime             @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt               DateTime             @updatedAt @map("updated_at") @db.Timestamp(6)
-  doctor                  DoctorProfile        @relation(fields: [doctorId], references: [id])
-  patient                 PatientProfile       @relation(fields: [patientId], references: [id])
-  screening               Screening?           @relation(fields: [screeningId], references: [id])
-  slot                    DoctorSlot           @relation(fields: [slotId, doctorId], references: [id, doctorId])
-  conversation            Conversation?
-  payoutItem              DoctorPayoutItem?
-  review                  DoctorReview?
-  payments                PaymentTransaction[]
-  prescription            Prescription?
+  id                               String                    @id @default(uuid()) @db.Uuid
+  patientId                        String                    @map("patient_id") @db.Uuid
+  doctorId                         String                    @map("doctor_id") @db.Uuid
+  slotId                           String                    @unique(map: "appointments_one_active_per_slot", where: raw("(status <> 'CANCELLED'::appointment_status)")) @map("slot_id") @db.Uuid
+  screeningId                      String?                   @map("screening_id") @db.Uuid
+  status                           AppointmentStatus         @default(HELD)
+  videoLink                        String?                   @map("video_link")
+
+  googleCalendarEventId            String?                   @unique @map("google_calendar_event_id")
+  meetingProvisioningStatus        MeetingProvisioningStatus @default(NOT_REQUESTED) @map("meeting_provisioning_status")
+  meetingProvisioningAttempts      Int                       @default(0) @map("meeting_provisioning_attempts")
+  meetingProvisioningNextAttemptAt DateTime?                 @map("meeting_provisioning_next_attempt_at") @db.Timestamp(6)
+  meetingProvisioningLockedAt      DateTime?                 @map("meeting_provisioning_locked_at") @db.Timestamp(6)
+  meetingProvisioningError         String?                   @map("meeting_provisioning_error") @db.VarChar(500)
+
+  historySharingConsent            Boolean                   @default(false) @map("history_sharing_consent")
+  cancellationReason               String?                   @map("cancellation_reason")
+  cancellationRequestedAt          DateTime?                 @map("cancellation_requested_at") @db.Timestamp(6)
+  holdExpiresAt                    DateTime?                 @map("hold_expires_at") @db.Timestamp(6)
+  createdAt                        DateTime                  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt                        DateTime                  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctor       DoctorProfile  @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  slot         DoctorSlot     @relation(fields: [slotId, doctorId], references: [id, doctorId], onDelete: Restrict)
+  screening    Screening?     @relation(fields: [screeningId], references: [id], onDelete: SetNull)
+
+  prescription Prescription?
+  conversation Conversation?
+  review       DoctorReview?
+  payoutItem   DoctorPayoutItem?
+  payments     PaymentTransaction[]
 
   @@index([slotId])
   @@index([patientId, status])
   @@index([doctorId, status])
   @@index([status, holdExpiresAt])
+  @@index([meetingProvisioningStatus, meetingProvisioningNextAttemptAt])
   @@map("appointments")
 }
