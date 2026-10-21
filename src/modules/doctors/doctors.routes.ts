@@ -8,6 +8,7 @@ import { doctorController } from "./doctor.controller.js";
 
 import {
   createSlotController,
+  deleteSlotController,
   getAvailableSlotsController,
   getMySlotsController,
   updateSlotController,
@@ -69,6 +70,13 @@ router.patch(
   authenticate,
   authorize(Role.DOCTOR),
   asyncHandler(updateSlotController),
+);
+
+router.delete(
+  "/me/slots/:slotId",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(deleteSlotController),
 );
 
 // Doctor appointment requests

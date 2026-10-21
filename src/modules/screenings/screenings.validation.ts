@@ -3,6 +3,11 @@ import { z } from "zod";
 
 export const createScreeningSchema = z.object({
   symptoms: z.string().trim().min(1).max(5000),
+  hasBleeding: z.boolean().optional(),
+  rapidGrowth: z.boolean().optional(),
+  hasFever: z.boolean().optional(),
+  hasUlceration: z.boolean().optional(),
+  severePain: z.boolean().optional(),
 }).strict();
 
 export const screeningImageSchema = z.object({

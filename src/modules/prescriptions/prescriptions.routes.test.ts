@@ -14,5 +14,7 @@ test("mounts Doctor prescription lifecycle and Patient privacy routes", () => {
     "POST /prescriptions/:id/send",
     "GET /patients/me/prescriptions",
     "GET /patients/me/prescriptions/:id",
+    "GET /doctors/me/prescriptions",
+    "GET /prescriptions",
   ]);
 });

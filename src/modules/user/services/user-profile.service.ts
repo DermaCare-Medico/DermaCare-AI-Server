@@ -19,25 +19,24 @@ const profileSelect = {
     updatedAt: true,
 } satisfies Prisma.UserSelect;
 
-const requireActiveAdmin = async (userId: string) => {
+const requireActiveUser = async (userId: string) => {
     const user = await prisma.user.findFirst({
         where: {
             id: userId,
-            role: Role.ADMIN,
             status: AccountStatus.ACTIVE,
             deletedAt: null,
         },
         select: profileSelect,
     });
 
-    if (!user) throw new AppError("Active administrator profile not found", 403);
+    if (!user) throw new AppError("Active user profile not found", 404);
     return user;
 };
 
-const getMyProfile = (userId: string) => requireActiveAdmin(userId);
+const getMyProfile = (userId: string) => requireActiveUser(userId);
 
 const updateMyProfile = async (userId: string, input: UpdateUserProfileInput) => {
-    await requireActiveAdmin(userId);
+    await requireActiveUser(userId);
 
     try {
         return await prisma.user.update({

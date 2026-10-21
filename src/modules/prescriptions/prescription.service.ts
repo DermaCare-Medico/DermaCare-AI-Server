@@ -40,7 +40,7 @@ async function getDoctor(userId: string) {
 }
 
 const itemData = (item: PrescriptionItemInput) => ({
-  medicineId: item.medicineId,
+  medicineId: item.medicineId ?? null,
   medicineName: item.medicineName,
   dosage: item.dosage,
   frequency: item.frequency,
@@ -183,6 +183,24 @@ async function getPatient(userId: string) {
   });
   if (!patient) throw new AppError("Active patient required", 403);
   return patient;
+}
+
+export async function listDoctorPrescriptions(userId: string, page: number, limit: number) {
+  const doctor = await getDoctor(userId);
+  const where: Prisma.PrescriptionWhereInput = {
+    doctorId: doctor.id,
+  };
+  const [prescriptions, total] = await prisma.$transaction([
+    prisma.prescription.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+      select: prescriptionSelect,
+    }),
+    prisma.prescription.count({ where }),
+  ]);
+  return { prescriptions, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
 }
 
 export async function listPatientPrescriptions(userId: string, page: number, limit: number) {

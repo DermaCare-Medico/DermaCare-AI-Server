@@ -13,5 +13,7 @@ router.post("/prescriptions/:id/finalize", authorize(Role.DOCTOR), asyncHandler(
 router.post("/prescriptions/:id/send", authorize(Role.DOCTOR), asyncHandler(prescriptionController.send));
 router.get("/patients/me/prescriptions", authorize(Role.PATIENT), asyncHandler(prescriptionController.listMine));
 router.get("/patients/me/prescriptions/:id", authorize(Role.PATIENT), asyncHandler(prescriptionController.getMine));
+router.get("/doctors/me/prescriptions", authorize(Role.DOCTOR), asyncHandler(prescriptionController.list));
+router.get("/prescriptions", authorize(Role.DOCTOR, Role.PATIENT, Role.ADMIN), asyncHandler(prescriptionController.list));
 
 export default router;

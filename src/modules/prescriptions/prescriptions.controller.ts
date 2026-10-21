@@ -1,8 +1,10 @@
 import type { Request, Response } from "express";
 import { AppError } from "../../shared/errors/AppError.js";
+import { Role } from "../../generated/prisma/client.js";
 import {
   createPrescription,
   getPatientPrescription,
+  listDoctorPrescriptions,
   listPatientPrescriptions,
   replacePrescriptionItems,
   sendPrescription,
@@ -54,5 +56,15 @@ export const prescriptionController = {
     const { id } = prescriptionIdSchema.parse(req.params);
     const data = await getPatientPrescription(userId(req), id);
     res.status(200).json({ success: true, data });
+  },
+  list: async (req: Request, res: Response) => {
+    const { page, limit } = prescriptionListSchema.parse(req.query);
+    const role = req.auth?.role;
+    if (role === Role.DOCTOR) {
+      const data = await listDoctorPrescriptions(userId(req), page, limit);
+      return res.status(200).json({ success: true, data: data.prescriptions, pagination: data.pagination });
+    }
+    const data = await listPatientPrescriptions(userId(req), page, limit);
+    return res.status(200).json({ success: true, data: data.prescriptions, pagination: data.pagination });
   },
 };

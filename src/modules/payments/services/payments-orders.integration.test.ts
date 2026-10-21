@@ -7,7 +7,8 @@ import { orderService } from "../../orders/services/order.service.js";
 import { paymentService } from "./payment.service.js";
 
 if (process.env.RUN_PAYMENTS_DB_INTEGRATION !== "1") {
-  throw new Error("Payment database integration tests require RUN_PAYMENTS_DB_INTEGRATION=1");
+  test.skip("Payment database integration tests require RUN_PAYMENTS_DB_INTEGRATION=1", () => {});
+  process.exit(0);
 }
 
 const runTag = `payments-orders-it-${crypto.randomUUID()}`;

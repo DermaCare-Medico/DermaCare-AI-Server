@@ -4,7 +4,7 @@ export const prescriptionIdSchema = z.object({ id: z.string().uuid() });
 export const appointmentPrescriptionIdSchema = z.object({ id: z.string().uuid() });
 
 export const prescriptionItemSchema = z.object({
-  medicineId: z.string().uuid(),
+  medicineId: z.string().uuid().optional(),
   medicineName: z.string().trim().min(1).max(255),
   dosage: z.string().trim().min(1).max(100),
   frequency: z.string().trim().min(1).max(100),

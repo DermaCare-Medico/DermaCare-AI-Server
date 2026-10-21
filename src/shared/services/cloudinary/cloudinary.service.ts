@@ -1,6 +1,7 @@
 
 import { v2 as cloudinary } from "cloudinary";
 import type { UploadApiOptions, UploadApiResponse } from "cloudinary";
+import { env } from "../../../config/env.js";
 import { AppError } from "../../errors/AppError.js";
 
 
@@ -9,9 +10,9 @@ let configured = false;
 export function ensureCloudinaryConfigured(): void {
   if (configured) return;
 
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  const cloudName = env.CLOUDINARY_CLOUD_NAME ?? process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = env.CLOUDINARY_API_KEY ?? process.env.CLOUDINARY_API_KEY;
+  const apiSecret = env.CLOUDINARY_API_SECRET ?? process.env.CLOUDINARY_API_SECRET;
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new AppError("Image storage is not configured", 503);

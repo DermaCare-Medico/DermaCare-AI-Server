@@ -23,6 +23,16 @@ import {
 } from "../../orders/services/order-payment.rules.js";
 import { requestMeetingProvisioning } from "../../../integrations/google-calendar/meeting-provisioning.worker.js";
 import { createNotification } from "../../notifications/services/notification.service.js";
+import { env } from "../../../config/env.js";
+
+const ensureDemoPaymentsAllowed = () => {
+    if (env.NODE_ENV === "production" || !env.ALLOW_DEMO_PAYMENTS) {
+        throw new AppError(
+            "Demo payments are disabled in this environment. Use Stripe checkout.",
+            HTTP_STATUS.FORBIDDEN,
+        );
+    }
+};
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -53,6 +63,7 @@ const getActivePatient = async (userId: string) => {
 };
 
 const payForAppointment = async (userId: string, appointmentId: string) => {
+    ensureDemoPaymentsAllowed();
     const patient = await getActivePatient(userId);
 
     try {
@@ -67,6 +78,7 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
                     status: true,
                     slotId: true,
                     doctorId: true,
+                    holdExpiresAt: true,
                     doctor: {
                         select: {
                             userId: true,
@@ -101,6 +113,13 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
                 || appointment.status !== AppointmentStatus.PENDING) {
                 throw new AppError(
                     "Appointment is not approved for payment",
+                    HTTP_STATUS.CONFLICT,
+                );
+            }
+
+            if (appointment.holdExpiresAt && appointment.holdExpiresAt <= new Date()) {
+                throw new AppError(
+                    "Appointment payment window has expired",
                     HTTP_STATUS.CONFLICT,
                 );
             }
@@ -229,6 +248,8 @@ const getAppointmentPayment = async (userId: string, appointmentId: string) => {
                     amount: true,
                     currency: true,
                     paidAt: true,
+                    refundStatus: true,
+                    refundedAt: true,
                 },
             },
         },
@@ -252,6 +273,7 @@ const payForOrder = async (
     orderId: string,
     input: OrderPaymentInput,
 ) => {
+    ensureDemoPaymentsAllowed();
     const patient = await getActivePatient(userId);
 
     try {
@@ -371,6 +393,8 @@ const getOrderPayment = async (userId: string, orderId: string) => {
                     currency: true,
                     provider: true,
                     paidAt: true,
+                    refundStatus: true,
+                    refundedAt: true,
                     createdAt: true,
                 },
             },

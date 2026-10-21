@@ -12,6 +12,10 @@ export interface GoogleProfile {
 
 // Verifies the signature, audience and expiry with Google's public keys
 export const verifyGoogleIdToken = async (idToken: string): Promise<GoogleProfile> => {
+  if (!env.GOOGLE_CLIENT_ID) {
+    throw new AppError("Google authentication is not configured", 503);
+  }
+
   try {
     const ticket = await client.verifyIdToken({
       idToken,

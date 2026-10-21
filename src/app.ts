@@ -19,7 +19,7 @@ app.use(security);
 app.use(httpLogger);
 app.post(
   "/api/v1/payments/stripe/webhook",
-  express.raw({ type: "application/json", limit: "1mb" }),
+  express.raw({ type: "application/json", limit: "5mb" }),
   asyncHandler(paymentWebhookController.handleStripeWebhook),
 );
 app.use(express.json({ limit: "1mb" }));

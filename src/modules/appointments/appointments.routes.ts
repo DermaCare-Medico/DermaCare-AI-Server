@@ -7,7 +7,10 @@ import { appointmentController } from "./controllers/appointment.controller.js";
 import {
     validateAppointmentId,
     validateAppointmentListQuery,
+    validateCancellationDecision,
+    validateCancellationRequest,
     validateCreateAppointment,
+    validateDirectCancel,
 } from "./appointments.validation.js";
 
 const appointmentRouter = Router();
@@ -36,6 +39,32 @@ appointmentRouter.get(
     authorize(Role.DOCTOR),
     validateAppointmentId,
     asyncHandler(appointmentController.getDoctorAppointmentByIdController),
+);
+
+// Cancellation and lifecycle transitions
+appointmentRouter.post(
+    "/appointments/:id/cancellation-request",
+    authorize(Role.PATIENT),
+    validateCancellationRequest,
+    asyncHandler(appointmentController.requestCancellationController),
+);
+appointmentRouter.patch(
+    "/appointments/:id/cancellation",
+    authorize(Role.DOCTOR, Role.ADMIN),
+    validateCancellationDecision,
+    asyncHandler(appointmentController.reviewCancellationController),
+);
+appointmentRouter.post(
+    "/appointments/:id/cancel",
+    authorize(Role.PATIENT, Role.DOCTOR, Role.ADMIN),
+    validateDirectCancel,
+    asyncHandler(appointmentController.cancelAppointmentController),
+);
+appointmentRouter.patch(
+    "/appointments/:id/no-show",
+    authorize(Role.DOCTOR, Role.ADMIN),
+    validateAppointmentId,
+    asyncHandler(appointmentController.markNoShowController),
 );
 
 export default appointmentRouter;

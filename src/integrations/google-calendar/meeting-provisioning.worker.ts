@@ -54,7 +54,14 @@ const claimNextMeeting = async (): Promise<ClaimedMeeting | null> => {
       ],
     },
     orderBy: { meetingProvisioningNextAttemptAt: "asc" },
-    select: { id: true, meetingProvisioningStatus: true, meetingProvisioningLockedAt: true, slot: { select: { startTime: true, endTime: true } } },
+    select: {
+      id: true,
+      meetingProvisioningStatus: true,
+      meetingProvisioningLockedAt: true,
+      slot: { select: { startTime: true, endTime: true } },
+      patient: { select: { user: { select: { email: true } } } },
+      doctor: { select: { user: { select: { email: true } } } },
+    },
   });
   if (!candidate) return null;
 
@@ -80,6 +87,8 @@ const claimNextMeeting = async (): Promise<ClaimedMeeting | null> => {
     appointmentId: candidate.id,
     startTime: candidate.slot.startTime,
     endTime: candidate.slot.endTime,
+    patientEmail: candidate.patient.user.email,
+    doctorEmail: candidate.doctor.user.email,
     attempts: row.meetingProvisioningAttempts,
   };
 };

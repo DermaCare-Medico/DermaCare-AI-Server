@@ -6,6 +6,7 @@ import {
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
+import { presentDoctorSpecializations } from "../doctor-specializations.presenter.js";
 
 export const getApprovedDoctors = async (query: {
   page: number;
@@ -60,8 +61,16 @@ export const getApprovedDoctors = async (query: {
     prisma.doctorProfile.count({ where }),
   ]);
 
+  const formattedDoctors = doctors.map((doc) => {
+    const { specializations: rawSpecs, ...rest } = doc;
+    return {
+      ...rest,
+      ...presentDoctorSpecializations(rawSpecs),
+    };
+  });
+
   return {
-    data: doctors,
+    data: formattedDoctors,
     pagination: {
       page,
       limit,
@@ -106,5 +115,9 @@ export const getApprovedDoctorById = async (doctorId: string) => {
     throw new AppError("Doctor not found", 404);
   }
 
-  return doctor;
+  const { specializations: rawSpecs, ...rest } = doctor;
+  return {
+    ...rest,
+    ...presentDoctorSpecializations(rawSpecs),
+  };
 };

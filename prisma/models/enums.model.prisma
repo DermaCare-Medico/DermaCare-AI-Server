@@ -151,6 +151,14 @@ enum TransactionStatus {
   @@map("transaction_status")
 }
 
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+
+  @@map("refund_status")
+}
+
 enum TransactionPurpose {
   APPOINTMENT
   MEDICINE_ORDER

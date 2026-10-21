@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import {
   createDoctorSlot,
+  deleteDoctorSlot,
   getAvailableDoctorSlots,
   getMyDoctorSlots,
   updateDoctorSlot,
@@ -76,5 +77,22 @@ export async function updateSlotController(
     success: true,
     message: "Slot updated successfully",
     data: slot,
+  });
+}
+
+export async function deleteSlotController(
+  req: Request,
+  res: Response,
+) {
+  const { slotId } = doctorSlotParamsSchema.parse(req.params);
+
+  const result = await deleteDoctorSlot(
+    getUserId(req),
+    slotId,
+  );
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: result.message,
   });
 }

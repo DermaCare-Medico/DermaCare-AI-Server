@@ -25,6 +25,7 @@ import {
     createNotification,
     createNotificationIfEligible,
 } from "../../notifications/services/notification.service.js";
+import { requestStripeRefunds, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -339,6 +340,8 @@ const orderDetailsSelect = {
             status: true,
             provider: true,
             paidAt: true,
+            refundStatus: true,
+            refundedAt: true,
         },
         orderBy: { createdAt: "desc" as const },
     },
@@ -362,7 +365,7 @@ const updateOrderStatusForAdmin = async (
 ) => {
     await requireActiveAdmin(adminUserId);
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
         const existing = await tx.order.findUnique({
             where: { id: orderId },
             select: {
@@ -381,6 +384,14 @@ const updateOrderStatusForAdmin = async (
             },
         });
         if (!existing) throw new AppError("Order not found", 404);
+        if (existing.status === OrderStatus.CANCELLED && input.status === OrderStatus.CANCELLED) {
+            const refundPaymentIds = await stagePaymentRefunds(tx, { orderId });
+            const order = await tx.order.findUniqueOrThrow({
+                where: { id: orderId },
+                select: orderDetailsSelect,
+            });
+            return { order, refundPaymentIds };
+        }
         if (!getAllowedOrderTransitions(existing.status).includes(input.status)) {
             throw new AppError(
                 `Order cannot transition from ${existing.status} to ${input.status}`,
@@ -407,6 +418,7 @@ const updateOrderStatusForAdmin = async (
         });
         if (updated.count !== 1) throw new AppError("Order status changed; please retry", 409);
 
+        let refundPaymentIds: string[] = [];
         if (input.status === OrderStatus.CANCELLED) {
             const quantitiesByInventory = aggregateInventoryQuantities(existing.items);
 
@@ -416,6 +428,8 @@ const updateOrderStatusForAdmin = async (
                     data: { stockQuantity: { increment: quantity } },
                 });
             }
+
+            refundPaymentIds = await stagePaymentRefunds(tx, { orderId });
         }
 
         await tx.auditLog.create({
@@ -439,11 +453,14 @@ const updateOrderStatusForAdmin = async (
             relatedEntityId: orderId,
         }, tx);
 
-        return tx.order.findUniqueOrThrow({
+        const order = await tx.order.findUniqueOrThrow({
             where: { id: orderId },
             select: orderDetailsSelect,
         });
+        return { order, refundPaymentIds };
     });
+    await requestStripeRefunds(result.refundPaymentIds);
+    return result.order;
 };
 
 const cleanupExpiredUnpaidOrders = async (now = new Date(), batchSize = 100) => {

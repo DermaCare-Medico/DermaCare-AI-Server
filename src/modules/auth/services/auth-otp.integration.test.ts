@@ -13,7 +13,8 @@ import { passwordResetService } from "./password-reset.service.js";
 import { registrationService } from "./registration.service.js";
 
 if (process.env.RUN_AUTH_DB_INTEGRATION !== "1") {
-  throw new Error("Auth database integration tests require RUN_AUTH_DB_INTEGRATION=1");
+  test.skip("Auth database integration tests require RUN_AUTH_DB_INTEGRATION=1", () => {});
+  process.exit(0);
 }
 
 const runTag = `auth-otp-it-${crypto.randomUUID()}`;

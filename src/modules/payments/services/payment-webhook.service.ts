@@ -17,6 +17,7 @@ import { requestMeetingProvisioning } from "../../../integrations/google-calenda
 import { createNotificationIfEligible } from "../../notifications/services/notification.service.js";
 import { isOrderPaymentExpired } from "../../orders/services/order-payment.rules.js";
 import { stripePaymentMatches } from "./stripe-payment.rules.js";
+import { reconcileStripeRefund } from "./stripe-refund.service.js";
 
 let stripeClient: Stripe | undefined;
 const stripe = () => {
@@ -48,6 +49,10 @@ async function markUnsuccessful(session: Stripe.Checkout.Session) {
 }
 
 async function completeAppointment(session: Stripe.Checkout.Session, paymentId: string) {
+  const paymentIntentId = typeof session.payment_intent === "string"
+    ? session.payment_intent
+    : session.payment_intent?.id;
+  if (!paymentIntentId) throw new AppError("Stripe PaymentIntent reference is missing", 400);
   const completed = await prisma.$transaction(async (tx) => {
     const payment = await tx.paymentTransaction.findUnique({
       where: { id: paymentId },
@@ -55,7 +60,7 @@ async function completeAppointment(session: Stripe.Checkout.Session, paymentId: 
         id: true, patientId: true, appointmentId: true, amount: true, currency: true, status: true,
         appointment: {
           select: {
-            id: true, patientId: true, doctorId: true, slotId: true, status: true,
+            id: true, patientId: true, doctorId: true, slotId: true, status: true, holdExpiresAt: true,
             doctor: { select: { userId: true, consultationFee: true } },
           },
         },
@@ -73,7 +78,8 @@ async function completeAppointment(session: Stripe.Checkout.Session, paymentId: 
       || !stripePaymentMatches(payment.amount, payment.currency, session.amount_total, session.currency)) {
       throw new AppError("Stripe payment details do not match the appointment", 400);
     }
-    if (payment.appointment.status !== AppointmentStatus.PENDING) {
+    if (payment.appointment.status !== AppointmentStatus.PENDING
+      || (payment.appointment.holdExpiresAt && payment.appointment.holdExpiresAt <= new Date())) {
       await tx.paymentTransaction.updateMany({
         where: { id: payment.id, status: TransactionStatus.PENDING },
         data: { status: TransactionStatus.FAILED },
@@ -83,7 +89,11 @@ async function completeAppointment(session: Stripe.Checkout.Session, paymentId: 
 
     const claimed = await tx.paymentTransaction.updateMany({
       where: { id: payment.id, status: TransactionStatus.PENDING },
-      data: { status: TransactionStatus.PAID, paidAt: new Date() },
+      data: {
+        status: TransactionStatus.PAID,
+        paidAt: new Date(),
+        stripePaymentIntentId: paymentIntentId,
+      },
     });
     if (claimed.count !== 1) return false;
     const appointment = await tx.appointment.updateMany({
@@ -128,6 +138,10 @@ async function completeAppointment(session: Stripe.Checkout.Session, paymentId: 
 }
 
 async function completeOrder(session: Stripe.Checkout.Session, paymentId: string) {
+  const paymentIntentId = typeof session.payment_intent === "string"
+    ? session.payment_intent
+    : session.payment_intent?.id;
+  if (!paymentIntentId) throw new AppError("Stripe PaymentIntent reference is missing", 400);
   await prisma.$transaction(async (tx) => {
     const payment = await tx.paymentTransaction.findUnique({
       where: { id: paymentId },
@@ -156,7 +170,11 @@ async function completeOrder(session: Stripe.Checkout.Session, paymentId: string
     }
     const claimed = await tx.paymentTransaction.updateMany({
       where: { id: payment.id, status: TransactionStatus.PENDING },
-      data: { status: TransactionStatus.PAID, paidAt: new Date() },
+      data: {
+        status: TransactionStatus.PAID,
+        paidAt: new Date(),
+        stripePaymentIntentId: paymentIntentId,
+      },
     });
     if (claimed.count !== 1) return;
     const order = await tx.order.updateMany({
@@ -183,10 +201,63 @@ async function completeOrder(session: Stripe.Checkout.Session, paymentId: string
 
 async function handlePaidSession(session: Stripe.Checkout.Session) {
   if (session.payment_status !== "paid") return;
-  const payment = await prisma.paymentTransaction.findUnique({
+  let payment = await prisma.paymentTransaction.findUnique({
     where: { providerTransactionId: session.id },
     select: { id: true, purpose: true },
   });
+
+  // PAY-02: Gracefully reconcile and persist payment if webhook arrives before client write finished
+  if (!payment && session.metadata?.patientId && session.metadata?.entityId) {
+    const context = session.metadata.context;
+    const patientId = session.metadata.patientId;
+    const entityId = session.metadata.entityId;
+    const amount = new Prisma.Decimal((session.amount_total ?? 0) / 100);
+
+    if (context === "appointment") {
+      try {
+        payment = await prisma.paymentTransaction.create({
+          data: {
+            patientId,
+            appointmentId: entityId,
+            purpose: TransactionPurpose.APPOINTMENT,
+            amount,
+            currency: "BDT",
+            status: TransactionStatus.PENDING,
+            provider: "STRIPE",
+            providerTransactionId: session.id,
+          },
+          select: { id: true, purpose: true },
+        });
+      } catch {
+        payment = await prisma.paymentTransaction.findUnique({
+          where: { providerTransactionId: session.id },
+          select: { id: true, purpose: true },
+        });
+      }
+    } else if (context === "order") {
+      try {
+        payment = await prisma.paymentTransaction.create({
+          data: {
+            patientId,
+            orderId: entityId,
+            purpose: TransactionPurpose.MEDICINE_ORDER,
+            amount,
+            currency: "BDT",
+            status: TransactionStatus.PENDING,
+            provider: "STRIPE",
+            providerTransactionId: session.id,
+          },
+          select: { id: true, purpose: true },
+        });
+      } catch {
+        payment = await prisma.paymentTransaction.findUnique({
+          where: { providerTransactionId: session.id },
+          select: { id: true, purpose: true },
+        });
+      }
+    }
+  }
+
   if (!payment) throw new AppError("Stripe checkout session is not registered", 400);
   if (payment.purpose === TransactionPurpose.APPOINTMENT) {
     await completeAppointment(session, payment.id);
@@ -202,6 +273,10 @@ export async function processStripeEvent(event: Stripe.Event) {
   } else if (event.type === "checkout.session.expired"
     || event.type === "checkout.session.async_payment_failed") {
     await markUnsuccessful(event.data.object);
+  } else if (event.type === "refund.created"
+    || event.type === "refund.updated"
+    || event.type === "refund.failed") {
+    await reconcileStripeRefund(event.data.object);
   }
 }
 

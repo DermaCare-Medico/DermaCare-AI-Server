@@ -139,6 +139,11 @@ export async function decideDoctorAppointment(
     }
 
     if (action === "ACCEPT") {
+      const PAYMENT_WINDOW_MS = 15 * 60 * 1000;
+      const paymentExpiresAt = new Date(
+        Math.min(Date.now() + PAYMENT_WINDOW_MS, appointment.slot.startTime.getTime())
+      );
+
       const updated = await tx.appointment.updateMany({
         where: {
           id: appointment.id,
@@ -147,7 +152,7 @@ export async function decideDoctorAppointment(
         },
         data: {
           status: AppointmentStatus.PENDING,
-          holdExpiresAt: null,
+          holdExpiresAt: paymentExpiresAt,
         },
       });
 

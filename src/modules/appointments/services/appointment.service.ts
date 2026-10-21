@@ -6,6 +6,7 @@ import {
     Prisma,
     Role,
     SlotStatus,
+    TransactionPurpose,
     TransactionStatus,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
@@ -19,6 +20,7 @@ import type { AdminAppointmentListQuery } from "../../admin/admin.validation.js"
 import { requireActiveAdmin } from "../../admin/services/admin.service.js";
 import { canExposeMeeting } from "../../../integrations/google-calendar/meeting-access.rules.js";
 import { presentDoctorSpecializations } from "../../doctors/doctor-specializations.presenter.js";
+import { requestStripeRefunds, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
 
 const httpError = (statusCode: number, message: string) => new AppError(message, statusCode);
 
@@ -36,6 +38,21 @@ const getActivePatient = async (userId: string) => {
     if (!user) throw httpError(403, "Only active patients may access appointments");
     if (!user.patientProfile) throw httpError(404, "Patient profile not found");
     return user.patientProfile;
+};
+
+const getActiveDoctor = async (userId: string) => {
+    const user = await prisma.user.findFirst({
+        where: {
+            id: userId,
+            role: Role.DOCTOR,
+            status: AccountStatus.ACTIVE,
+            deletedAt: null,
+        },
+        select: { doctorProfile: { select: { id: true } } },
+    });
+
+    if (!user?.doctorProfile) throw httpError(403, "Only active approved doctors may perform this action");
+    return user.doctorProfile;
 };
 
 const appointmentSelect = {
@@ -156,8 +173,14 @@ const createAppointment = async (
                 const expiredHold = await tx.appointment.findFirst({
                     where: {
                         slotId: payload.slotId,
-                        status: AppointmentStatus.HELD,
+                        status: { in: [AppointmentStatus.HELD, AppointmentStatus.PENDING] },
                         holdExpiresAt: { lte: new Date() },
+                        payments: {
+                            none: {
+                                purpose: TransactionPurpose.APPOINTMENT,
+                                status: TransactionStatus.PAID,
+                            },
+                        },
                     },
                     select: { id: true },
                 });
@@ -166,7 +189,7 @@ const createAppointment = async (
                         where: { id: expiredHold.id },
                         data: {
                             status: AppointmentStatus.CANCELLED,
-                            cancellationReason: "Hold expired",
+                            cancellationReason: "Hold / payment deadline expired",
                         },
                     });
                     await tx.doctorSlot.update({
@@ -373,6 +396,301 @@ const getAppointmentForAdmin = async (adminUserId: string, appointmentId: string
     return appointment;
 };
 
+const cleanupExpiredAppointments = async () => {
+    const now = new Date();
+    return prisma.$transaction(async (tx) => {
+        const expired = await tx.appointment.findMany({
+            where: {
+                OR: [
+                    {
+                        status: AppointmentStatus.HELD,
+                        holdExpiresAt: { lte: now },
+                    },
+                    {
+                        status: AppointmentStatus.PENDING,
+                        holdExpiresAt: { lte: now },
+                        payments: {
+                            none: {
+                                purpose: TransactionPurpose.APPOINTMENT,
+                                status: TransactionStatus.PAID,
+                            },
+                        },
+                    },
+                ],
+            },
+            select: {
+                id: true,
+                slotId: true,
+            },
+            take: 100,
+        });
+
+        if (expired.length === 0) return 0;
+
+        const expiredIds = expired.map((a) => a.id);
+        const slotIds = expired.map((a) => a.slotId);
+
+        await tx.appointment.updateMany({
+            where: { id: { in: expiredIds } },
+            data: {
+                status: AppointmentStatus.CANCELLED,
+                cancellationReason: "Hold / payment deadline expired",
+            },
+        });
+
+        await tx.doctorSlot.updateMany({
+            where: {
+                id: { in: slotIds },
+                status: SlotStatus.HELD,
+            },
+            data: { status: SlotStatus.AVAILABLE },
+        });
+
+        return expired.length;
+    });
+};
+
+const requestCancellation = async (userId: string, appointmentId: string, reason: string) => {
+    const patient = await getActivePatient(userId);
+    return prisma.$transaction(async (tx) => {
+        const appointment = await tx.appointment.findFirst({
+            where: { id: appointmentId, patientId: patient.id },
+            include: { doctor: { select: { userId: true } } },
+        });
+        if (!appointment) throw httpError(404, "Appointment not found");
+        if (appointment.status !== AppointmentStatus.CONFIRMED) {
+            throw httpError(409, "Only confirmed appointments can have cancellation requested");
+        }
+        const updated = await tx.appointment.update({
+            where: { id: appointmentId },
+            data: {
+                status: AppointmentStatus.CANCELLATION_REQUESTED,
+                cancellationReason: reason,
+                cancellationRequestedAt: new Date(),
+            },
+            select: appointmentSelect,
+        });
+        await createNotification({
+            userId: appointment.doctor.userId,
+            title: "Cancellation requested",
+            message: "A patient has requested cancellation for an upcoming consultation.",
+            notificationType: NotificationType.APPOINTMENT,
+            relatedEntityType: "Appointment",
+            relatedEntityId: appointment.id,
+        }, tx);
+        return presentAppointment(updated, false);
+    });
+};
+
+const reviewCancellation = async (
+    userId: string,
+    role: Role,
+    appointmentId: string,
+    input: { action: "APPROVE" | "REJECT"; reviewNotes: string },
+) => {
+    const result = await prisma.$transaction(async (tx) => {
+        const appointment = await tx.appointment.findUnique({
+            where: { id: appointmentId },
+            include: {
+                doctor: { select: { id: true, userId: true } },
+                patient: { select: { id: true, userId: true } },
+            },
+        });
+        if (!appointment) throw httpError(404, "Appointment not found");
+        if (role === Role.DOCTOR) {
+            const doctor = await getActiveDoctor(userId);
+            if (appointment.doctorId !== doctor.id) {
+                throw httpError(403, "Doctor is not assigned to this appointment");
+            }
+        } else if (role !== Role.ADMIN) {
+            throw httpError(403, "Unauthorized to review cancellation");
+        }
+
+        if (appointment.status === AppointmentStatus.CANCELLED && input.action === "APPROVE") {
+            const refundPaymentIds = await stagePaymentRefunds(tx, { appointmentId });
+            const existing = await tx.appointment.findUniqueOrThrow({
+                where: { id: appointmentId },
+                select: appointmentSelect,
+            });
+            return { data: presentAppointment(existing, false), refundPaymentIds };
+        }
+
+        if (appointment.status !== AppointmentStatus.CANCELLATION_REQUESTED) {
+            throw httpError(409, "Appointment does not have a pending cancellation request");
+        }
+
+        if (input.action === "APPROVE") {
+            const updated = await tx.appointment.update({
+                where: { id: appointmentId },
+                data: {
+                    status: AppointmentStatus.CANCELLED,
+                    cancellationReason: input.reviewNotes,
+                },
+                select: appointmentSelect,
+            });
+            await tx.doctorSlot.updateMany({
+                where: { id: appointment.slotId },
+                data: { status: SlotStatus.AVAILABLE },
+            });
+            const refundPaymentIds = await stagePaymentRefunds(tx, { appointmentId });
+            await createNotification({
+                userId: appointment.patient.userId,
+                title: "Cancellation approved",
+                message: `Your appointment cancellation request was approved: ${input.reviewNotes}`,
+                notificationType: NotificationType.APPOINTMENT,
+                relatedEntityType: "Appointment",
+                relatedEntityId: appointment.id,
+            }, tx);
+            return { data: presentAppointment(updated, false), refundPaymentIds };
+        } else {
+            const updated = await tx.appointment.update({
+                where: { id: appointmentId },
+                data: {
+                    status: AppointmentStatus.CONFIRMED,
+                    cancellationReason: null,
+                    cancellationRequestedAt: null,
+                },
+                select: appointmentSelect,
+            });
+            await createNotification({
+                userId: appointment.patient.userId,
+                title: "Cancellation rejected",
+                message: `Your appointment cancellation request was rejected: ${input.reviewNotes}`,
+                notificationType: NotificationType.APPOINTMENT,
+                relatedEntityType: "Appointment",
+                relatedEntityId: appointment.id,
+            }, tx);
+            return { data: presentAppointment(updated, false), refundPaymentIds: [] as string[] };
+        }
+    });
+    await requestStripeRefunds(result.refundPaymentIds);
+    return result.data;
+};
+
+const cancelAppointment = async (
+    userId: string,
+    role: Role,
+    appointmentId: string,
+    reason: string,
+) => {
+    const result = await prisma.$transaction(async (tx) => {
+        const appointment = await tx.appointment.findUnique({
+            where: { id: appointmentId },
+            include: {
+                doctor: { select: { id: true, userId: true } },
+                patient: { select: { id: true, userId: true } },
+            },
+        });
+        if (!appointment) throw httpError(404, "Appointment not found");
+
+        if (role === Role.PATIENT) {
+            const patient = await getActivePatient(userId);
+            if (appointment.patientId !== patient.id) throw httpError(403, "Not your appointment");
+        } else if (role === Role.DOCTOR) {
+            const doctor = await getActiveDoctor(userId);
+            if (appointment.doctorId !== doctor.id) throw httpError(403, "Doctor is not assigned to this appointment");
+        } else if (role !== Role.ADMIN) {
+            throw httpError(403, "Unauthorized");
+        }
+
+        if (appointment.status === AppointmentStatus.CANCELLED) {
+            const refundPaymentIds = await stagePaymentRefunds(tx, { appointmentId });
+            const existing = await tx.appointment.findUniqueOrThrow({
+                where: { id: appointmentId },
+                select: appointmentSelect,
+            });
+            return { data: presentAppointment(existing, false), refundPaymentIds };
+        }
+
+        if (role === Role.PATIENT
+            && appointment.status !== AppointmentStatus.HELD
+            && appointment.status !== AppointmentStatus.PENDING) {
+            throw httpError(409, "Confirmed appointments require submitting a cancellation request");
+        }
+        if (role === Role.DOCTOR && appointment.status === AppointmentStatus.COMPLETED) {
+            throw httpError(409, "Completed appointments cannot be cancelled");
+        }
+
+        const updated = await tx.appointment.update({
+            where: { id: appointmentId },
+            data: {
+                status: AppointmentStatus.CANCELLED,
+                cancellationReason: reason,
+            },
+            select: appointmentSelect,
+        });
+
+        await tx.doctorSlot.updateMany({
+            where: { id: appointment.slotId },
+            data: { status: SlotStatus.AVAILABLE },
+        });
+
+        const refundPaymentIds = await stagePaymentRefunds(tx, { appointmentId });
+
+        const notifyUserId = role === Role.PATIENT ? appointment.doctor.userId : appointment.patient.userId;
+        await createNotification({
+            userId: notifyUserId,
+            title: "Appointment cancelled",
+            message: `Appointment was cancelled: ${reason}`,
+            notificationType: NotificationType.APPOINTMENT,
+            relatedEntityType: "Appointment",
+            relatedEntityId: appointment.id,
+        }, tx);
+
+        return { data: presentAppointment(updated, false), refundPaymentIds };
+    });
+    await requestStripeRefunds(result.refundPaymentIds);
+    return result.data;
+};
+
+const markNoShow = async (
+    userId: string,
+    role: Role,
+    appointmentId: string,
+) => {
+    return prisma.$transaction(async (tx) => {
+        const appointment = await tx.appointment.findUnique({
+            where: { id: appointmentId },
+            include: {
+                doctor: { select: { id: true, userId: true } },
+                patient: { select: { id: true, userId: true } },
+                slot: true,
+            },
+        });
+        if (!appointment) throw httpError(404, "Appointment not found");
+
+        if (role === Role.DOCTOR) {
+            const doctor = await getActiveDoctor(userId);
+            if (appointment.doctorId !== doctor.id) throw httpError(403, "Doctor is not assigned to this appointment");
+        } else if (role !== Role.ADMIN) {
+            throw httpError(403, "Unauthorized");
+        }
+
+        if (appointment.status !== AppointmentStatus.CONFIRMED) {
+            throw httpError(409, "Only confirmed appointments can be marked as no-show");
+        }
+
+        const updated = await tx.appointment.update({
+            where: { id: appointmentId },
+            data: {
+                status: AppointmentStatus.NO_SHOW,
+            },
+            select: appointmentSelect,
+        });
+
+        await createNotification({
+            userId: appointment.patient.userId,
+            title: "Appointment marked as no-show",
+            message: "You missed your scheduled consultation appointment.",
+            notificationType: NotificationType.APPOINTMENT,
+            relatedEntityType: "Appointment",
+            relatedEntityId: appointment.id,
+        }, tx);
+
+        return presentAppointment(updated, false);
+    });
+};
+
 export const appointmentService = {
     createAppointment,
     getMyAppointments,
@@ -380,4 +698,9 @@ export const appointmentService = {
     getDoctorAppointmentById,
     listAppointmentsForAdmin,
     getAppointmentForAdmin,
+    cleanupExpiredAppointments,
+    requestCancellation,
+    reviewCancellation,
+    cancelAppointment,
+    markNoShow,
 };

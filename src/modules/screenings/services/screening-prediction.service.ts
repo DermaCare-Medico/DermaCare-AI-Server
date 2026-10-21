@@ -3,8 +3,10 @@ import { randomUUID } from "node:crypto";
 import { writeFile, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { NotificationType } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
+import { createNotification, createNotificationIfEligible } from "../../notifications/services/notification.service.js";
 import {
   predictSkinImage,
   UnusableScreeningImageError,
@@ -135,18 +137,31 @@ export async function processScreeningPrediction(
       })),
       screening.redFlagDetected,
     );
-    const disclaimer = safety.uncertain
-      ? "This AI result is low-confidence and non-diagnostic. Consult a qualified doctor for assessment."
-      : "AI screening is not a medical diagnosis. Consult a qualified doctor.";
+    const disclaimer = safety.redFlagDetected
+      ? "Potential clinical red flags indicated. Prompt medical evaluation by a licensed healthcare professional is strongly advised. AI screening is non-diagnostic."
+      : safety.uncertain
+        ? "This AI result is low-confidence and non-diagnostic. Consult a qualified doctor for assessment."
+        : "AI screening is not a medical diagnosis. Consult a qualified doctor.";
 
     await prisma.$transaction(async (tx) => {
-      await tx.screeningPrediction.deleteMany({
-        where: { screeningId },
-      });
-
-      await tx.screeningPrediction.createMany({
-        data: predictionRows,
-      });
+      // AI-03: Multi-view aggregation: keep highest confidence and aggregate across views
+      for (const row of predictionRows) {
+        const existing = await tx.screeningPrediction.findFirst({
+          where: { screeningId, conditionId: row.conditionId },
+        });
+        if (existing) {
+          if (Number(row.confidenceScore) > Number(existing.confidenceScore)) {
+            await tx.screeningPrediction.update({
+              where: { id: existing.id },
+              data: { confidenceScore: row.confidenceScore },
+            });
+          }
+        } else {
+          await tx.screeningPrediction.create({
+            data: row,
+          });
+        }
+      }
 
       await tx.screening.update({
         where: { id: screeningId },
@@ -158,6 +173,17 @@ export async function processScreeningPrediction(
           imageQualityStatus: "GOOD",
         },
       });
+
+      await createNotification({
+        userId,
+        title: "AI screening completed",
+        message: safety.redFlagDetected
+          ? "Your AI skin screening results are ready. Prompt clinical review is advised."
+          : "Your AI skin screening results are ready to view.",
+        notificationType: NotificationType.SYSTEM,
+        relatedEntityType: "Screening",
+        relatedEntityId: screeningId,
+      }, tx);
     });
 
     return {
@@ -191,6 +217,15 @@ export async function processScreeningPrediction(
           statusError,
         );
       });
+
+    await createNotification({
+      userId,
+      title: "AI screening failed",
+      message: "Your AI skin screening could not be processed. Please retry with a clearer photo.",
+      notificationType: NotificationType.SYSTEM,
+      relatedEntityType: "Screening",
+      relatedEntityId: screeningId,
+    }).catch(() => {});
 
     throw error;
   }

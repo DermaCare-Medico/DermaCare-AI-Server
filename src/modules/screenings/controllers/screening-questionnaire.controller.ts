@@ -20,7 +20,7 @@ export async function createScreeningController(
 
   const screening = await createScreening(
     req.auth.userId,
-    parsed.data.symptoms,
+    parsed.data,
   );
 
   return res.status(201).json({

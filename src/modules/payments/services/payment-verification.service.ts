@@ -95,6 +95,7 @@ export async function createAppointmentCheckout(userId: string, appointmentId: s
     select: {
       id: true,
       status: true,
+      holdExpiresAt: true,
       doctor: { select: { approvalStatus: true, consultationFee: true } },
       payments: {
         where: { purpose: TransactionPurpose.APPOINTMENT, status: TransactionStatus.PAID },
@@ -107,6 +108,9 @@ export async function createAppointmentCheckout(userId: string, appointmentId: s
     || appointment.doctor.approvalStatus !== DoctorApprovalStatus.APPROVED
     || appointment.payments.length > 0) {
     throw new AppError("Appointment is not eligible for payment", 409);
+  }
+  if (appointment.holdExpiresAt && appointment.holdExpiresAt <= new Date()) {
+    throw new AppError("Appointment payment window has expired", 409);
   }
 
   const reusable = await reusableCheckout({

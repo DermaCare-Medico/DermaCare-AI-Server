@@ -119,3 +119,28 @@ export async function updateDoctorSlot(
     return tx.doctorSlot.findUniqueOrThrow({ where: { id: slotId } });
   });
 }
+
+export async function deleteDoctorSlot(userId: string, slotId: string) {
+  const doctor = await getDoctorProfile(userId);
+
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctor.id}, 0))`;
+    const slot = await tx.doctorSlot.findFirst({
+      where: { id: slotId, doctorId: doctor.id },
+      select: { id: true },
+    });
+    if (!slot) throw new AppError("Slot not found", HTTP_STATUS.NOT_FOUND);
+
+    const deleted = await tx.doctorSlot.deleteMany({
+      where: {
+        id: slotId,
+        doctorId: doctor.id,
+        appointments: { none: { status: { not: "CANCELLED" } } },
+      },
+    });
+    if (deleted.count !== 1) {
+      throw new AppError("A slot with an active appointment cannot be deleted", HTTP_STATUS.CONFLICT);
+    }
+    return { success: true, message: "Slot deleted successfully" };
+  });
+}

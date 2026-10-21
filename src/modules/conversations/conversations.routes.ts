@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { chatMessageLimiter, chatPollingLimiter } from "../../middlewares/rateLimiter.js";
 import { openAppointmentConversationController } from "./controllers/conversation.controller.js";
 import { listMessagesController, sendMessageController } from "./controllers/message.controller.js";
 
@@ -11,10 +12,12 @@ router.get(
 );
 router.get(
   "/conversations/:conversationId/messages",
+  chatPollingLimiter,
   asyncHandler(listMessagesController),
 );
 router.post(
   "/conversations/:conversationId/messages",
+  chatMessageLimiter,
   asyncHandler(sendMessageController),
 );
 

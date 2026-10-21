@@ -74,3 +74,15 @@ export const loginFailureLimiter = rateLimit({
     message: "Too many failed login attempts. Please try again later.",
   },
 });
+
+export const chatMessageLimiter = createRateLimiter(
+  60_000,
+  30,
+  "Too many messages sent. Please slow down.",
+);
+
+export const chatPollingLimiter = createRateLimiter(
+  60_000,
+  120,
+  "Too many chat polling requests. Please slow down.",
+);
