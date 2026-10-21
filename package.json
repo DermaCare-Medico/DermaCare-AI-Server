@@ -9,7 +9,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test:orders": "tsx --test src/modules/orders/services/order-payment.rules.test.ts",
+    "test:orders": "tsx --test src/modules/orders/services/*.test.ts",
     "test:meetings": "tsx --test src/integrations/google-calendar/*.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

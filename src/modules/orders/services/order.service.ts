@@ -21,7 +21,10 @@ import {
     getOrderPaymentExpiry,
 } from "./order-payment.rules.js";
 import { getAllowedOrderTransitions } from "./order-status.rules.js";
-import { createNotification } from "../../notifications/services/notification.service.js";
+import {
+    createNotification,
+    createNotificationIfEligible,
+} from "../../notifications/services/notification.service.js";
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -427,7 +430,7 @@ const updateOrderStatusForAdmin = async (
             },
         });
 
-        await createNotification({
+        await createNotificationIfEligible({
             userId: existing.patient.userId,
             title: "Order status updated",
             message: `Your medicine order status is now ${input.status}.`,

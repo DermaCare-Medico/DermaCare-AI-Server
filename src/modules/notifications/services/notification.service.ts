@@ -41,6 +41,37 @@ export const createNotification = async (
     });
 };
 
+export const createNotificationIfEligible = async (
+    input: CreateNotificationInput,
+    transactionClient: Prisma.TransactionClient,
+) => {
+    const recipient = await transactionClient.user.findFirst({
+        where: {
+            id: input.userId,
+            status: AccountStatus.ACTIVE,
+            deletedAt: null,
+        },
+        select: { id: true },
+    });
+
+    if (!recipient) return null;
+
+    return transactionClient.notification.create({
+        data: {
+            userId: input.userId,
+            title: input.title,
+            message: input.message,
+            notificationType: input.notificationType,
+            ...(input.relatedEntityType !== undefined && {
+                relatedEntityType: input.relatedEntityType,
+            }),
+            ...(input.relatedEntityId !== undefined && {
+                relatedEntityId: input.relatedEntityId,
+            }),
+        },
+    });
+};
+
 const requireActiveUser = async (userId: string) => {
     const user = await prisma.user.findFirst({
         where: {
