@@ -1,10 +1,11 @@
 model Specialization {
-  id          String          @id @default(uuid()) @db.Uuid
-  name        String          @unique @db.VarChar(150)
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(150)
   description String?
-  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
-  conditions  Condition[]
-  doctors     DoctorProfile[]
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  doctors    DoctorSpecialization[]
+  conditions ConditionSpecialization[]
 
   @@map("specializations")
 }
@@ -27,12 +28,13 @@ model DoctorProfile {
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  appointments     Appointment[]
-  conversations    Conversation[]
-  payouts          DoctorPayout[]
-  approvedBy       User?                @relation("DoctorApprover", fields: [approvedById], references: [id])
-  specialization   Specialization       @relation(fields: [specializationId], references: [id])
-  user             User                 @relation("DoctorUser", fields: [userId], references: [id])
+  appointments    Appointment[]
+  conversations   Conversation[]
+  payouts         DoctorPayout[]
+  approvedBy      User?                  @relation("DoctorApprover", fields: [approvedById], references: [id])
+  specializations DoctorSpecialization[]
+
+  user             User              @relation("DoctorUser", fields: [userId], references: [id])
   reviews          DoctorReview[]
   slots            DoctorSlot[]
   medicineRequests MedicineRequest[]
@@ -61,20 +63,20 @@ model DoctorSlot {
 }
 
 model DoctorPayout {
-  id                   String        @id @default(uuid()) @db.Uuid
-  doctorId             String        @map("doctor_id") @db.Uuid
-  periodStart          DateTime      @map("period_start") @db.Date
-  periodEnd            DateTime      @map("period_end") @db.Date
-  totalConsultations   Int           @default(0) @map("total_consultations")
-  grossAmount          Decimal       @map("gross_amount") @db.Decimal(10, 2)
-  platformFee          Decimal       @default(0) @map("platform_fee") @db.Decimal(10, 2)
-  netAmount            Decimal       @map("net_amount") @db.Decimal(10, 2)
-  status               PayoutStatus  @default(PENDING)
-  paidAt               DateTime?     @map("paid_at") @db.Timestamp(6)
-  transactionReference String?       @map("transaction_reference") @db.VarChar(255)
+  id                   String       @id @default(uuid()) @db.Uuid
+  doctorId             String       @map("doctor_id") @db.Uuid
+  periodStart          DateTime     @map("period_start") @db.Date
+  periodEnd            DateTime     @map("period_end") @db.Date
+  totalConsultations   Int          @default(0) @map("total_consultations")
+  grossAmount          Decimal      @map("gross_amount") @db.Decimal(10, 2)
+  platformFee          Decimal      @default(0) @map("platform_fee") @db.Decimal(10, 2)
+  netAmount            Decimal      @map("net_amount") @db.Decimal(10, 2)
+  status               PayoutStatus @default(PENDING)
+  paidAt               DateTime?    @map("paid_at") @db.Timestamp(6)
+  transactionReference String?      @map("transaction_reference") @db.VarChar(255)
   notes                String?
-  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamp(6)
+  createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamp(6)
 
   doctor DoctorProfile      @relation(fields: [doctorId], references: [id], onDelete: Restrict)
   items  DoctorPayoutItem[]
@@ -116,4 +118,28 @@ model DoctorReview {
   @@index([doctorId, createdAt])
   @@index([patientId])
   @@map("doctor_reviews")
+}
+
+model DoctorSpecialization {
+  doctorId         String @map("doctor_id") @db.Uuid
+  specializationId String @map("specialization_id") @db.Uuid
+
+  doctor         DoctorProfile  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  specialization Specialization @relation(fields: [specializationId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, specializationId])
+  @@index([specializationId])
+  @@map("doctor_specializations")
+}
+
+model ConditionSpecialization {
+  conditionId      String @map("condition_id") @db.Uuid
+  specializationId String @map("specialization_id") @db.Uuid
+
+  condition      Condition      @relation(fields: [conditionId], references: [id], onDelete: Cascade)
+  specialization Specialization @relation(fields: [specializationId], references: [id], onDelete: Cascade)
+
+  @@id([conditionId, specializationId])
+  @@index([specializationId])
+  @@map("condition_specializations")
 }

@@ -10,6 +10,11 @@ import {
   getScreeningHistoryController,
   getScreeningHistoryItemController,
 } from "./controllers/screening-history.controller.js";
+import {
+  getScreeningDoctorRecommendationsController,
+} from "./controllers/doctor-recommendation.controller.js";
+
+
 
 const router = Router();
 
@@ -30,6 +35,13 @@ router.get(
 router.get(
   "/history/:screeningId",
   getScreeningHistoryItemController,
+);
+
+router.get(
+  "/:screeningId/doctors",
+  authenticate,
+  authorize("PATIENT"),
+  getScreeningDoctorRecommendationsController,
 );
 
 export default router;

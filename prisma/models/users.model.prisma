@@ -1,30 +1,30 @@
 model User {
-  id                       String            @id @default(uuid()) @db.Uuid
-  name                     String            @db.VarChar(150)
-  email                    String            @unique @db.VarChar(255)
-  phone                    String?           @unique @db.VarChar(30)
-  role                     Role              @default(PATIENT)
-  status                   AccountStatus     @default(ACTIVE)
-  emailVerified            Boolean           @default(false) @map("email_verified")
-  suspendedAt              DateTime?         @map("suspended_at") @db.Timestamp(6)
-  createdAt                DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt                DateTime          @updatedAt @map("updated_at") @db.Timestamp(6)
-  deletedAt                DateTime?         @map("deleted_at") @db.Timestamp(6)
+  id            String        @id @default(uuid()) @db.Uuid
+  name          String        @db.VarChar(150)
+  email         String        @unique @db.VarChar(255)
+  phone         String?       @unique @db.VarChar(30)
+  role          Role          @default(PATIENT)
+  status        AccountStatus @default(ACTIVE)
+  emailVerified Boolean       @default(false) @map("email_verified")
+  suspendedAt   DateTime?     @map("suspended_at") @db.Timestamp(6)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt     DateTime?     @map("deleted_at") @db.Timestamp(6)
 
   // Consent Information
-  consentVersion           String?           @map("consent_version") @db.VarChar(20)
-  healthConsentAcceptedAt  DateTime?         @map("health_consent_accepted_at") @db.Timestamp(6)
-  privacyAcceptedAt        DateTime?         @map("privacy_accepted_at") @db.Timestamp(6)
-  termsAcceptedAt          DateTime?         @map("terms_accepted_at") @db.Timestamp(6)
+  consentVersion          String?   @map("consent_version") @db.VarChar(20)
+  healthConsentAcceptedAt DateTime? @map("health_consent_accepted_at") @db.Timestamp(6)
+  privacyAcceptedAt       DateTime? @map("privacy_accepted_at") @db.Timestamp(6)
+  termsAcceptedAt         DateTime? @map("terms_accepted_at") @db.Timestamp(6)
 
   // Authentication
-  refreshTokens            RefreshToken[]
-  authIdentities           AuthIdentity[]
+  refreshTokens  RefreshToken[]
+  authIdentities AuthIdentity[]
 
   // Profiles
-  patientProfile           PatientProfile?
-  doctorProfile            DoctorProfile?    @relation("DoctorUser")
-  adminProfile             Admin?
+  patientProfile PatientProfile?
+  doctorProfile  DoctorProfile?  @relation("DoctorUser")
+  adminProfile   Admin?
 
   // Relationships
   auditLogs                AuditLog[]

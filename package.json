@@ -14,7 +14,9 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "seed:screening-conditions": "tsx prisma/seeds/screening-conditions.seed.ts",
+    "seed:screening-specializations": "tsx prisma/seeds/screening-specializations.seed.ts"
   },
   "keywords": [
     "dermacare",
