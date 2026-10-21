@@ -12,6 +12,7 @@ import adminRoutes from "../modules/admin/admin.routes.js";
 import userRoutes from "../modules/user/user.module.js";
 import storeRoutes from "../modules/stores/stores.routes.js";
 import orderRoutes from "../modules/orders/orders.routes.js";
+import prescriptionRoutes from "../modules/prescriptions/prescriptions.routes.js";
 
 import screeningRoutes from "../modules/screenings/screenings.routes.js";
 
@@ -47,6 +48,7 @@ apiRouter.use(
   authenticate,
   authorize(Role.PATIENT, Role.DOCTOR),
   appointmentRoutes,
+  prescriptionRoutes,
 );
 apiRouter.use(
   authenticate,

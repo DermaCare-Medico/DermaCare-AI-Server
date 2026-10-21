@@ -71,7 +71,11 @@ test("doctor decision rejects expired hold, cancels appointment and frees slot",
 
 test("rebooking cleans up expired hold and restores slot availability", () => {
   const now = new Date("2026-10-21T10:20:00.000Z");
-  const existingAppointment = {
+  const existingAppointment: {
+    id: string;
+    status: AppointmentStatus;
+    holdExpiresAt: Date;
+  } = {
     id: "appt-1",
     status: AppointmentStatus.HELD,
     holdExpiresAt: new Date("2026-10-21T10:10:00.000Z"),
@@ -88,7 +92,11 @@ test("rebooking cleans up expired hold and restores slot availability", () => {
 });
 
 test("duplicate doctor acceptance is idempotent for PENDING appointment", () => {
-  const appointment = {
+  const appointment: {
+    id: string;
+    status: AppointmentStatus;
+    slot: { id: string; status: SlotStatus };
+  } = {
     id: "appt-1",
     status: AppointmentStatus.PENDING,
     slot: { id: "slot-1", status: SlotStatus.HELD },
@@ -112,7 +120,11 @@ test("duplicate doctor acceptance is idempotent for PENDING appointment", () => 
 });
 
 test("duplicate doctor rejection is idempotent for CANCELLED appointment", () => {
-  const appointment = {
+  const appointment: {
+    id: string;
+    status: AppointmentStatus;
+    slot: { id: string; status: SlotStatus };
+  } = {
     id: "appt-2",
     status: AppointmentStatus.CANCELLED,
     slot: { id: "slot-2", status: SlotStatus.AVAILABLE },
@@ -181,7 +193,10 @@ test("concurrent doctor decisions on HELD appointment produce exactly one transi
 
   const winners = [acceptResult, rejectResult].filter((count) => count === 1);
   assert.equal(winners.length, 1);
-  assert.ok(currentStatus === AppointmentStatus.PENDING || currentStatus === AppointmentStatus.CANCELLED);
+  assert.ok(
+    (currentStatus as AppointmentStatus) === AppointmentStatus.PENDING
+      || (currentStatus as AppointmentStatus) === AppointmentStatus.CANCELLED,
+  );
 });
 
 test("concurrent payments on PENDING appointment produce exactly one confirmed payment", async () => {

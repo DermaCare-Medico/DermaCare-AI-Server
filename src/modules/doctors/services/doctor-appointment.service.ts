@@ -4,11 +4,14 @@ import {
   NotificationType,
   Prisma,
   SlotStatus,
+  TransactionPurpose,
+  TransactionStatus,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 import { createNotification } from "../../notifications/services/notification.service.js";
+import { getConsultationCompletionAction } from "./consultation-completion.rules.js";
 
 async function getApprovedDoctor(userId: string) {
   const doctor = await prisma.doctorProfile.findUnique({
@@ -232,4 +235,69 @@ export async function decideDoctorAppointment(
   }, {
     isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
   });
+}
+
+export async function completeDoctorConsultation(
+  userId: string,
+  appointmentId: string,
+) {
+  const doctor = await getApprovedDoctor(userId);
+
+  return prisma.$transaction(async (tx) => {
+    const appointment = await tx.appointment.findFirst({
+      where: { id: appointmentId, doctorId: doctor.id },
+      select: {
+        id: true,
+        status: true,
+        payments: {
+          where: {
+            purpose: TransactionPurpose.APPOINTMENT,
+            status: TransactionStatus.PAID,
+          },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!appointment) {
+      throw new AppError("Appointment not found", HTTP_STATUS.NOT_FOUND);
+    }
+    const action = getConsultationCompletionAction(
+      appointment.status,
+      appointment.payments.length > 0,
+    );
+    if (action === "ALREADY_COMPLETED") {
+      return appointment;
+    }
+
+    const completed = await tx.appointment.updateMany({
+      where: {
+        id: appointment.id,
+        doctorId: doctor.id,
+        status: AppointmentStatus.CONFIRMED,
+        payments: {
+          some: {
+            purpose: TransactionPurpose.APPOINTMENT,
+            status: TransactionStatus.PAID,
+          },
+        },
+      },
+      data: { status: AppointmentStatus.COMPLETED },
+    });
+
+    if (completed.count !== 1) {
+      const current = await tx.appointment.findFirst({
+        where: { id: appointment.id, doctorId: doctor.id },
+        select: { id: true, status: true },
+      });
+      if (current?.status === AppointmentStatus.COMPLETED) return current;
+      throw new AppError("Appointment state changed; please retry", HTTP_STATUS.CONFLICT);
+    }
+
+    return tx.appointment.findUniqueOrThrow({
+      where: { id: appointment.id },
+      select: { id: true, status: true },
+    });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

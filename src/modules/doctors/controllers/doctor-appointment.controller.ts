@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import {
+  completeDoctorConsultation,
   decideDoctorAppointment,
   getDoctorAppointmentRequests,
 } from "../services/doctor-appointment.service.js";
@@ -13,6 +14,19 @@ function getUserId(req: Request) {
     throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
   }
   return userId;
+}
+
+export async function completeConsultationController(
+  req: Request,
+  res: Response,
+) {
+  const { appointmentId } = doctorAppointmentParamsSchema.parse(req.params);
+  const data = await completeDoctorConsultation(getUserId(req), appointmentId);
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: "Consultation completed successfully",
+    data,
+  });
 }
 
 export async function getAppointmentRequestsController(

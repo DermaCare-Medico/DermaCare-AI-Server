@@ -13,6 +13,7 @@ import {
 } from "./controllers/doctor-slot.controller.js";
 
 import {
+  completeConsultationController,
   getAppointmentRequestsController,
   decideAppointmentController,
 } from "./controllers/doctor-appointment.controller.js";
@@ -78,6 +79,13 @@ router.patch(
   authenticate,
   authorize(Role.DOCTOR),
   asyncHandler(decideAppointmentController),
+);
+
+router.patch(
+  "/me/appointments/:appointmentId/complete",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(completeConsultationController),
 );
 
 // Doctor medicine requests
