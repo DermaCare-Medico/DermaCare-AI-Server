@@ -1,48 +1,61 @@
 
 import { unlink } from "node:fs/promises";
 import { prisma } from "../../../lib/prisma.js";
+import { AppError } from "../../../shared/errors/AppError.js";
 import {
   uploadPrivateImage,
   deletePrivateImage,
 } from "../../../shared/services/cloudinary/cloudinary.service.js";
 import type { SaveScreeningImageInput } from "../../../types/screenings.types.js";
 
+interface UploadScreeningImageInput extends SaveScreeningImageInput {
+  userId: string;
+}
+
 export async function saveScreeningImage(
-  input: SaveScreeningImageInput,
+  input: UploadScreeningImageInput,
 ) {
-  const { screeningId, filePath, imageType } = input;
+  const { screeningId, filePath, imageType, userId } = input;
 
   let uploadedPublicId: string | undefined;
 
   try {
-    const screening = await prisma.screening.findUnique({
-      where: { id: screeningId },
+    const screening = await prisma.screening.findFirst({
+      where: {
+        id: screeningId,
+        patient: {
+          is: { userId },
+        },
+      },
       select: { id: true },
     });
 
     if (!screening) {
-      throw new Error("Screening not found");
+      throw new AppError(
+        "Screening not found or access denied",
+        404,
+      );
     }
 
-    const uploadedImage = await uploadPrivateImage(filePath);
-    uploadedPublicId = uploadedImage.public_id;
+    const uploaded = await uploadPrivateImage(filePath);
+    uploadedPublicId = uploaded.public_id;
 
-    const screeningImage = await prisma.screeningImage.create({
+    const image = await prisma.screeningImage.create({
       data: {
         screeningId,
-        storageKey: uploadedImage.public_id,
+        storageKey: uploaded.public_id,
         imageType,
       },
     });
 
-    return screeningImage;
+    return image;
   } catch (error) {
     if (uploadedPublicId) {
       try {
         await deletePrivateImage(uploadedPublicId);
       } catch (cleanupError) {
         console.error(
-          "Failed to clean up Cloudinary image:",
+          "Cloudinary cleanup failed:",
           cleanupError,
         );
       }
@@ -52,14 +65,11 @@ export async function saveScreeningImage(
   } finally {
     try {
       await unlink(filePath);
-    } catch (cleanupError) {
+    } catch (error) {
       if (
-        typeof cleanupError === "object" &&
-        cleanupError !== null &&
-        "code" in cleanupError &&
-        cleanupError.code !== "ENOENT"
+        (error as NodeJS.ErrnoException).code !== "ENOENT"
       ) {
-        console.error("Failed to remove temporary image:", cleanupError);
+        console.error("Temporary file cleanup failed:", error);
       }
     }
   }

@@ -1,34 +1,35 @@
 
 import multer from "multer";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-const allowedMimeTypes = [
+const allowedMimeTypes = new Set([
   "image/jpeg",
   "image/png",
-];
+]);
 
-const upload = multer({
+export const uploadScreeningImage = multer({
   storage: multer.diskStorage({
     destination: os.tmpdir(),
-    filename: (_req, _file, callback) => {
-      callback(null, `${randomUUID()}${path.extname(_file.originalname).toLowerCase()}`);
+    filename: (_req, file, callback) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+
+      callback(null, `${randomUUID()}${extension}`);
     },
   }),
   limits: {
     fileSize: 10 * 1024 * 1024,
     files: 1,
+    fields: 2,
   },
   fileFilter: (_req, file, callback) => {
-    if (!allowedMimeTypes.includes(file.mimetype)) {
+    if (!allowedMimeTypes.has(file.mimetype)) {
       return callback(
-        new Error("Only JPG, JPEG, and PNG images are allowed"),
+        new Error("Only JPG and PNG images are allowed"),
       );
     }
 
     callback(null, true);
   },
-});
-
-export const uploadScreeningImage = upload.single("image");
+}).single("image");

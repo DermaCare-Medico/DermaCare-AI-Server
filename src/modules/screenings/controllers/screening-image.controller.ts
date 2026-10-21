@@ -1,5 +1,8 @@
 
 import type { Request, Response } from "express";
+import { unlink } from "node:fs/promises";
+import { AppError } from "../../../shared/errors/AppError.js";
+import { screeningImageSchema } from "../screenings.validation.js";
 import { saveScreeningImage } from "../services/screening-image.service.js";
 
 export async function uploadScreeningImageController(
@@ -9,30 +12,32 @@ export async function uploadScreeningImageController(
   const file = req.file;
 
   if (!file) {
-    return res.status(400).json({
-      success: false,
-      message: "Please upload an image",
-    });
+    throw new AppError("Please upload an image", 400);
   }
 
-  const { screeningId, imageType } = req.body;
+  const validation = screeningImageSchema.safeParse(req.body);
 
-  if (!screeningId || !imageType) {
-    return res.status(400).json({
-      success: false,
-      message: "screeningId and imageType are required",
-    });
+  if (!validation.success) {
+    await unlink(file.path).catch(() => undefined);
+
+    throw new AppError("Invalid screening image input", 400);
   }
 
-  const screeningImage = await saveScreeningImage({
-    screeningId,
+  if (!req.auth) {
+    await unlink(file.path).catch(() => undefined);
+
+    throw new AppError("Authentication required", 401);
+  }
+
+  const image = await saveScreeningImage({
+    ...validation.data,
     filePath: file.path,
-    imageType,
+    userId: req.auth.userId,
   });
 
   return res.status(201).json({
     success: true,
     message: "Screening image uploaded successfully",
-    data: screeningImage,
+    data: image,
   });
 }
