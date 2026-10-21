@@ -18,6 +18,7 @@ import type {
 import type { AdminAppointmentListQuery } from "../../admin/admin.validation.js";
 import { requireActiveAdmin } from "../../admin/services/admin.service.js";
 import { canExposeMeeting } from "../../../integrations/google-calendar/meeting-access.rules.js";
+import { presentDoctorSpecializations } from "../../doctors/doctor-specializations.presenter.js";
 
 const httpError = (statusCode: number, message: string) => new AppError(message, statusCode);
 
@@ -57,7 +58,11 @@ const appointmentSelect = {
             rating: true,
             ratingCount: true,
             user: { select: { name: true } },
-            specialization: { select: { id: true, name: true } },
+            specializations: {
+                select: {
+                    specialization: { select: { id: true, name: true } },
+                },
+            },
         },
     },
     slot: { select: { id: true, startTime: true, endTime: true } },
@@ -92,7 +97,7 @@ const presentAppointment = (appointment: SelectedAppointment, includeDetails = f
         doctor: {
             id: appointment.doctor.id,
             name: appointment.doctor.user.name,
-            specialization: appointment.doctor.specialization,
+            ...presentDoctorSpecializations(appointment.doctor.specializations),
             consultationFee: appointment.doctor.consultationFee,
             ...(includeDetails && {
                 bio: appointment.doctor.bio,
@@ -278,7 +283,11 @@ const adminAppointmentSelect = {
         select: {
             id: true,
             user: { select: { id: true, name: true, email: true } },
-            specialization: { select: { id: true, name: true } },
+            specializations: {
+                select: {
+                    specialization: { select: { id: true, name: true } },
+                },
+            },
         },
     },
     slot: { select: { id: true, startTime: true, endTime: true, status: true } },

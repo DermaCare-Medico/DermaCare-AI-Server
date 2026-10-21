@@ -80,7 +80,11 @@ const userDetailsSelect = {
             consultationFee: true,
             rating: true,
             ratingCount: true,
-            specialization: { select: { id: true, name: true } },
+            specializations: {
+                select: {
+                    specialization: { select: { id: true, name: true } },
+                },
+            },
         },
     },
     adminProfile: { select: { id: true, createdAt: true } },
@@ -166,9 +170,15 @@ const listDoctors = async (adminUserId: string, query: AdminDoctorListQuery) => 
             ],
         }),
         ...(query.specialization && {
-            specialization: specializationIsId
-                ? { id: query.specialization }
-                : { name: { contains: query.specialization, mode: "insensitive" } },
+            specializations: {
+                some: specializationIsId
+                    ? { specializationId: query.specialization }
+                    : {
+                        specialization: {
+                            name: { contains: query.specialization, mode: "insensitive" },
+                        },
+                    },
+            },
         }),
     };
 
@@ -190,7 +200,11 @@ const listDoctors = async (adminUserId: string, query: AdminDoctorListQuery) => 
                 user: {
                     select: { id: true, name: true, email: true, status: true },
                 },
-                specialization: { select: { id: true, name: true } },
+                specializations: {
+                    select: {
+                        specialization: { select: { id: true, name: true } },
+                    },
+                },
             },
         }),
         prisma.doctorProfile.count({ where }),

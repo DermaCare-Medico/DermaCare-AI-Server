@@ -83,11 +83,13 @@ before(async () => {
       emailVerified: true,
       doctorProfile: {
         create: {
-          specializationId: specialization.id,
           licenseNumber: runTag,
           consultationFee: "500.00",
           approvalStatus: "APPROVED",
           approvedAt: new Date(),
+          specializations: {
+            create: { specializationId: specialization.id },
+          },
         },
       },
     },

@@ -54,11 +54,10 @@ apiRouter.use(
   patientRoutes,
   paymentRoutes,
   orderRoutes,
-  doctorRoutes,
 );
 
 apiRouter.use("/screenings", screeningRoutes);
 
-apiRouter.use("/api/doctors", doctorRoutes);
+apiRouter.use("/doctors", doctorRoutes);
 
 export default apiRouter;

@@ -139,6 +139,11 @@ adminRouter.get(
     validateAdminAppointmentId,
     asyncHandler(appointmentController.getAppointmentForAdmin),
 );
+adminRouter.post(
+    "/appointments/:id/meeting/retry",
+    validateAdminAppointmentId,
+    asyncHandler(adminController.retryMeetingProvisioning),
+);
 adminRouter.get(
     "/audit-logs",
     validateAdminAuditLogList,

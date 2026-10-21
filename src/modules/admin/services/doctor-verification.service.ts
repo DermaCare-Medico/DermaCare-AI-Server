@@ -35,9 +35,34 @@ const doctorDetailsSelect = {
             emailVerified: true,
         },
     },
-    specialization: { select: { id: true, name: true, description: true } },
+    specializations: {
+        select: {
+            specialization: { select: { id: true, name: true, description: true } },
+        },
+    },
     approvedBy: { select: { id: true, name: true } },
 } satisfies Prisma.DoctorProfileSelect;
+
+export const assertPendingDoctorApproval = (
+    approvalStatus: DoctorApprovalStatus,
+) => {
+    if (approvalStatus !== DoctorApprovalStatus.PENDING) {
+        throw new AppError("Doctor approval request has already been reviewed", 409);
+    }
+};
+
+export const assertDoctorAccountEligibleForApproval = (account: {
+    status: AccountStatus;
+    deletedAt: Date | null;
+}) => {
+    if (
+        account.deletedAt
+        || account.status === AccountStatus.SUSPENDED
+        || account.status === AccountStatus.REJECTED
+    ) {
+        throw new AppError("Doctor account is not eligible for approval", 400);
+    }
+};
 
 const getDoctor = async (adminUserId: string, doctorId: string) => {
     await requireActiveAdmin(adminUserId);
@@ -71,7 +96,11 @@ const listPendingApprovals = async (adminUserId: string, page: number, limit: nu
                 user: {
                     select: { id: true, name: true, email: true, status: true },
                 },
-                specialization: { select: { id: true, name: true } },
+                specializations: {
+                    select: {
+                        specialization: { select: { id: true, name: true } },
+                    },
+                },
             },
         }),
         prisma.doctorProfile.count({ where }),
@@ -99,16 +128,8 @@ const approveDoctor = async (adminUserId: string, doctorId: string) => {
             },
         });
         if (!doctor) throw new AppError("Doctor approval request not found", 404);
-        if (doctor.approvalStatus !== DoctorApprovalStatus.PENDING) {
-            throw new AppError("Doctor approval request has already been reviewed", 409);
-        }
-        if (
-            doctor.user.deletedAt
-            || doctor.user.status === AccountStatus.SUSPENDED
-            || doctor.user.status === AccountStatus.REJECTED
-        ) {
-            throw new AppError("Doctor account is not eligible for approval", 400);
-        }
+        assertPendingDoctorApproval(doctor.approvalStatus);
+        assertDoctorAccountEligibleForApproval(doctor.user);
 
         const approvedAt = new Date();
         const updated = await tx.doctorProfile.updateMany({
@@ -169,9 +190,7 @@ const rejectDoctor = async (adminUserId: string, doctorId: string, reason: strin
             select: { approvalStatus: true, userId: true },
         });
         if (!doctor) throw new AppError("Doctor approval request not found", 404);
-        if (doctor.approvalStatus !== DoctorApprovalStatus.PENDING) {
-            throw new AppError("Doctor approval request has already been reviewed", 409);
-        }
+        assertPendingDoctorApproval(doctor.approvalStatus);
 
         const updated = await tx.doctorProfile.updateMany({
             where: { id: doctorId, approvalStatus: DoctorApprovalStatus.PENDING },

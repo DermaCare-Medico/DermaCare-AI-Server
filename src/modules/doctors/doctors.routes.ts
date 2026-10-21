@@ -32,35 +32,15 @@ router.get("/:doctorId", doctorController.getById);
 router.post(
   "/application",
   authenticate,
+  authorize(Role.PATIENT),
   doctorController.submitApplication,
 );
 
 router.get(
   "/me/profile",
   authenticate,
+  authorize(Role.PATIENT, Role.DOCTOR),
   doctorController.getMyProfile,
-);
-
-// Admin-only application review
-router.get(
-  "/admin/applications/pending",
-  authenticate,
-  authorize(Role.ADMIN),
-  doctorController.getPendingApplications,
-);
-
-router.patch(
-  "/admin/applications/:applicationId/approve",
-  authenticate,
-  authorize(Role.ADMIN),
-  doctorController.approve,
-);
-
-router.patch(
-  "/admin/applications/:applicationId/reject",
-  authenticate,
-  authorize(Role.ADMIN),
-  doctorController.reject,
 );
 
 // Doctor slots

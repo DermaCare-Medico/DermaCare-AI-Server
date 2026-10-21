@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { listAuditLogs } from "../services/admin.service.js";
+import { recoverMeetingProvisioning } from "../../../integrations/google-calendar/meeting-provisioning.worker.js";
 
 const getAdminUserId = (req: Request) => {
     const userId = req.auth?.userId;
@@ -31,4 +32,18 @@ const getAuditLogs = async (req: Request, res: Response) => {
     });
 };
 
-export const adminController = { getAuditLogs };
+const retryMeetingProvisioning = async (req: Request, res: Response) => {
+    const result = await recoverMeetingProvisioning(
+        getAdminUserId(req),
+        req.params.id!,
+    );
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Google Meet provisioning queued for retry",
+        data: result,
+    });
+};
+
+export const adminController = { getAuditLogs, retryMeetingProvisioning };
