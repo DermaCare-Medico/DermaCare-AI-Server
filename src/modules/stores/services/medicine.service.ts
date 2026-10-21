@@ -40,8 +40,6 @@ const publicMedicineSelect = {
     description: true,
     requiresPrescription: true,
     inventory: {
-        where: { isAvailable: true, stockQuantity: { gt: 0 } },
-        take: 1,
         select: { price: true, stockQuantity: true },
     },
 } satisfies Prisma.MedicineSelect;
@@ -50,19 +48,25 @@ type PublicMedicineRecord = Prisma.MedicineGetPayload<{
     select: typeof publicMedicineSelect;
 }>;
 
-const presentPublicMedicine = (medicine: PublicMedicineRecord) => ({
-    id: medicine.id,
-    name: medicine.name,
-    strength: medicine.strength,
-    description: medicine.description,
-    requiresPrescription: medicine.requiresPrescription,
-    price: medicine.inventory[0]!.price,
-    stockQuantity: medicine.inventory[0]!.stockQuantity,
-});
+const presentPublicMedicine = (medicine: PublicMedicineRecord) => {
+    if (!medicine.inventory) {
+        throw new AppError("Medicine inventory not found", 409);
+    }
+
+    return {
+        id: medicine.id,
+        name: medicine.name,
+        strength: medicine.strength,
+        description: medicine.description,
+        requiresPrescription: medicine.requiresPrescription,
+        price: medicine.inventory.price,
+        stockQuantity: medicine.inventory.stockQuantity,
+    };
+};
 
 const publicMedicineWhere = (search?: string): Prisma.MedicineWhereInput => ({
     isVerified: true,
-    inventory: { some: { isAvailable: true, stockQuantity: { gt: 0 } } },
+    inventory: { is: { isAvailable: true, stockQuantity: { gt: 0 } } },
     ...(search && {
         OR: [
             { name: { contains: search, mode: "insensitive" } },
@@ -119,7 +123,7 @@ const listMedicinesForAdmin = async (
             ],
         }),
         inventory: {
-            some: {
+            is: {
                 ...(query.isAvailable !== undefined && {
                     isAvailable: query.isAvailable,
                 }),
@@ -228,7 +232,7 @@ const updateMedicineForAdmin = async (
         });
         if (!existing) throw new AppError("Medicine not found", 404);
 
-        const inventory = existing.inventory[0];
+        const inventory = existing.inventory;
         const changesInventory = input.price !== undefined
             || input.stockQuantity !== undefined
             || input.isAvailable !== undefined;
