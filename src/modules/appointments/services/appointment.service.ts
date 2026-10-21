@@ -46,6 +46,7 @@ const appointmentSelect = {
     videoLink: true,
     meetingProvisioningStatus: true,
     cancellationReason: true,
+    holdExpiresAt: true,
     createdAt: true,
     updatedAt: true,
     doctor: {
@@ -118,6 +119,7 @@ const presentAppointment = (appointment: SelectedAppointment, includeDetails = f
             screening: appointment.screening,
             historySharingConsent: appointment.historySharingConsent,
             cancellationReason: appointment.cancellationReason,
+            holdExpiresAt: appointment.holdExpiresAt,
             updatedAt: appointment.updatedAt,
         }),
         createdAt: appointment.createdAt,
@@ -149,6 +151,32 @@ const createAppointment = async (
             if (!slot) throw httpError(404, "Doctor slot not found");
             if (slot.doctorId !== doctor.id) throw httpError(400, "Slot does not belong to the selected doctor");
             if (slot.startTime <= new Date()) throw httpError(400, "Past slots cannot be booked");
+
+            if (slot.status === SlotStatus.HELD) {
+                const expiredHold = await tx.appointment.findFirst({
+                    where: {
+                        slotId: payload.slotId,
+                        status: AppointmentStatus.HELD,
+                        holdExpiresAt: { lte: new Date() },
+                    },
+                    select: { id: true },
+                });
+                if (expiredHold) {
+                    await tx.appointment.update({
+                        where: { id: expiredHold.id },
+                        data: {
+                            status: AppointmentStatus.CANCELLED,
+                            cancellationReason: "Hold expired",
+                        },
+                    });
+                    await tx.doctorSlot.update({
+                        where: { id: payload.slotId },
+                        data: { status: SlotStatus.AVAILABLE },
+                    });
+                    slot.status = SlotStatus.AVAILABLE;
+                }
+            }
+
             if (slot.status !== SlotStatus.AVAILABLE) throw httpError(409, "Slot is not available");
 
             if (payload.screeningId) {
@@ -170,6 +198,9 @@ const createAppointment = async (
             });
             if (claimed.count !== 1) throw httpError(409, "Slot was reserved by another patient");
 
+            const HOLD_DURATION_MS = 10 * 60 * 1000;
+            const holdExpiresAt = new Date(Math.min(Date.now() + HOLD_DURATION_MS, slot.startTime.getTime()));
+
             const appointment = await tx.appointment.create({
                 data: {
                     patientId: patient.id,
@@ -177,6 +208,7 @@ const createAppointment = async (
                     slotId: payload.slotId,
                     screeningId: payload.screeningId,
                     status: AppointmentStatus.HELD,
+                    holdExpiresAt,
                     ...(payload.historySharingConsent !== undefined && {
                         historySharingConsent: payload.historySharingConsent,
                     }),

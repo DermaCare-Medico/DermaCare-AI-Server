@@ -1,11 +1,14 @@
 import {
   AppointmentStatus,
   DoctorApprovalStatus,
+  NotificationType,
+  Prisma,
   SlotStatus,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
+import { createNotification } from "../../notifications/services/notification.service.js";
 
 async function getApprovedDoctor(userId: string) {
   const doctor = await prisma.doctorProfile.findUnique({
@@ -35,7 +38,11 @@ export async function getDoctorAppointmentRequests(userId: string) {
   return prisma.appointment.findMany({
     where: {
       doctorId: doctor.id,
-      status: AppointmentStatus.PENDING,
+      status: AppointmentStatus.HELD,
+      OR: [
+        { holdExpiresAt: null },
+        { holdExpiresAt: { gt: new Date() } },
+      ],
     },
     include: {
       slot: true,
@@ -73,7 +80,12 @@ export async function decideDoctorAppointment(
         id: appointmentId,
         doctorId: doctor.id,
       },
-      include: { slot: true },
+      include: {
+        slot: true,
+        patient: {
+          select: { userId: true },
+        },
+      },
     });
 
     if (!appointment) {
@@ -83,42 +95,115 @@ export async function decideDoctorAppointment(
       );
     }
 
-    if (appointment.status !== AppointmentStatus.PENDING) {
+    // Idempotent duplicate check: already in requested state
+    if (action === "ACCEPT" && appointment.status === AppointmentStatus.PENDING) {
+      return appointment;
+    }
+    if (action === "REJECT" && appointment.status === AppointmentStatus.CANCELLED) {
+      return appointment;
+    }
+
+    if (appointment.status !== AppointmentStatus.HELD) {
       throw new AppError(
         "This appointment is not awaiting a decision",
         HTTP_STATUS.CONFLICT,
       );
     }
 
-    if (action === "ACCEPT") {
-      const slotUpdate = await tx.doctorSlot.updateMany({
+    // Check if the hold has expired
+    if (appointment.holdExpiresAt && appointment.holdExpiresAt <= new Date()) {
+      await tx.appointment.update({
+        where: { id: appointment.id },
+        data: {
+          status: AppointmentStatus.CANCELLED,
+          cancellationReason: "Hold expired",
+        },
+      });
+
+      await tx.doctorSlot.updateMany({
         where: {
           id: appointment.slotId,
           doctorId: doctor.id,
           status: SlotStatus.HELD,
         },
-        data: { status: SlotStatus.BOOKED },
+        data: { status: SlotStatus.AVAILABLE },
       });
 
-      if (slotUpdate.count !== 1) {
+      throw new AppError(
+        "Appointment hold has expired",
+        HTTP_STATUS.CONFLICT,
+      );
+    }
+
+    if (action === "ACCEPT") {
+      const updated = await tx.appointment.updateMany({
+        where: {
+          id: appointment.id,
+          doctorId: doctor.id,
+          status: AppointmentStatus.HELD,
+        },
+        data: {
+          status: AppointmentStatus.PENDING,
+          holdExpiresAt: null,
+        },
+      });
+
+      if (updated.count !== 1) {
+        const current = await tx.appointment.findFirst({
+          where: { id: appointment.id },
+          include: { slot: true },
+        });
+        if (current?.status === AppointmentStatus.PENDING) {
+          return current;
+        }
         throw new AppError(
-          "The appointment slot is no longer available",
+          "This appointment is not awaiting a decision",
           HTTP_STATUS.CONFLICT,
         );
       }
 
-      return tx.appointment.update({
+      await createNotification({
+        userId: appointment.patient.userId,
+        title: "Appointment accepted",
+        message: "Your appointment has been accepted by the doctor. Please proceed with payment to confirm.",
+        notificationType: NotificationType.APPOINTMENT,
+        relatedEntityType: "Appointment",
+        relatedEntityId: appointment.id,
+      }, tx);
+
+      return tx.appointment.findUniqueOrThrow({
         where: { id: appointment.id },
-        data: { status: AppointmentStatus.CONFIRMED },
         include: { slot: true },
       });
     }
 
-    const rejected = await tx.appointment.update({
-      where: { id: appointment.id },
-      data: { status: AppointmentStatus.CANCELLED },
-      include: { slot: true },
+    // action === "REJECT"
+    const rejectedUpdate = await tx.appointment.updateMany({
+      where: {
+        id: appointment.id,
+        doctorId: doctor.id,
+        status: AppointmentStatus.HELD,
+      },
+      data: {
+        status: AppointmentStatus.CANCELLED,
+        cancellationReason: reason || "Rejected by doctor",
+        holdExpiresAt: null,
+      },
     });
+
+    if (rejectedUpdate.count !== 1) {
+      const current = await tx.appointment.findFirst({
+        where: { id: appointment.id },
+        include: { slot: true },
+      });
+      if (current?.status === AppointmentStatus.CANCELLED) {
+        return current;
+      }
+      throw new AppError(
+        "This appointment is not awaiting a decision",
+        HTTP_STATUS.CONFLICT,
+      );
+    }
 
     await tx.doctorSlot.updateMany({
       where: {
@@ -129,10 +214,22 @@ export async function decideDoctorAppointment(
       data: { status: SlotStatus.AVAILABLE },
     });
 
-    // Keep `reason` for your API/audit layer if a rejection reason
-    // field is added to Appointment. No refund/payment logic here.
-    void reason;
+    await createNotification({
+      userId: appointment.patient.userId,
+      title: "Appointment declined",
+      message: reason
+        ? `Your appointment request was declined by the doctor: ${reason}`
+        : "Your appointment request was declined by the doctor.",
+      notificationType: NotificationType.APPOINTMENT,
+      relatedEntityType: "Appointment",
+      relatedEntityId: appointment.id,
+    }, tx);
 
-    return rejected;
+    return tx.appointment.findUniqueOrThrow({
+      where: { id: appointment.id },
+      include: { slot: true },
+    });
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
   });
 }

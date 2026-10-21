@@ -9,6 +9,7 @@ import {
     Role,
     TransactionPurpose,
     TransactionStatus,
+    SlotStatus,
     MeetingProvisioningStatus,
     NotificationType,
 } from "../../../generated/prisma/client.js";
@@ -64,6 +65,8 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
                 select: {
                     id: true,
                     status: true,
+                    slotId: true,
+                    doctorId: true,
                     doctor: {
                         select: {
                             userId: true,
@@ -128,6 +131,15 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
                     HTTP_STATUS.CONFLICT,
                 );
             }
+
+            await tx.doctorSlot.updateMany({
+                where: {
+                    id: appointment.slotId,
+                    doctorId: appointment.doctorId,
+                    status: SlotStatus.HELD,
+                },
+                data: { status: SlotStatus.BOOKED },
+            });
 
             const paidAt = new Date();
             const payment = await tx.paymentTransaction.create({
