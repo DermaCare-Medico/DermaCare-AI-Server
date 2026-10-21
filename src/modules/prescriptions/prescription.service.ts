@@ -8,7 +8,7 @@ import {
 } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { AppError } from "../../shared/errors/AppError.js";
-import { createNotification } from "../notifications/services/notification.service.js";
+import { createNotificationIfEligible } from "../notifications/services/notification.service.js";
 import { canCreatePrescription, isPrescriptionMutable } from "./prescription.rules.js";
 import type { PrescriptionItemInput } from "./prescriptions.validation.js";
 
@@ -164,7 +164,7 @@ export async function sendPrescription(userId: string, prescriptionId: string) {
     if (sent.count !== 1) {
       return tx.prescription.findUniqueOrThrow({ where: { id: prescriptionId }, select: prescriptionSelect });
     }
-    await createNotification({
+    await createNotificationIfEligible({
       userId: prescription.appointment.patient.userId,
       title: "New prescription available",
       message: "Your doctor has sent a prescription after your consultation.",

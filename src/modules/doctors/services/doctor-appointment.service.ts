@@ -10,7 +10,7 @@ import {
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
-import { createNotification } from "../../notifications/services/notification.service.js";
+import { createNotificationIfEligible } from "../../notifications/services/notification.service.js";
 import { getConsultationCompletionAction } from "./consultation-completion.rules.js";
 
 async function getApprovedDoctor(userId: string) {
@@ -165,7 +165,7 @@ export async function decideDoctorAppointment(
         );
       }
 
-      await createNotification({
+      await createNotificationIfEligible({
         userId: appointment.patient.userId,
         title: "Appointment accepted",
         message: "Your appointment has been accepted by the doctor. Please proceed with payment to confirm.",
@@ -217,12 +217,10 @@ export async function decideDoctorAppointment(
       data: { status: SlotStatus.AVAILABLE },
     });
 
-    await createNotification({
+    await createNotificationIfEligible({
       userId: appointment.patient.userId,
       title: "Appointment declined",
-      message: reason
-        ? `Your appointment request was declined by the doctor: ${reason}`
-        : "Your appointment request was declined by the doctor.",
+      message: "Your appointment request was declined by the doctor.",
       notificationType: NotificationType.APPOINTMENT,
       relatedEntityType: "Appointment",
       relatedEntityId: appointment.id,
@@ -249,6 +247,7 @@ export async function completeDoctorConsultation(
       select: {
         id: true,
         status: true,
+        patient: { select: { userId: true } },
         payments: {
           where: {
             purpose: TransactionPurpose.APPOINTMENT,
@@ -294,6 +293,15 @@ export async function completeDoctorConsultation(
       if (current?.status === AppointmentStatus.COMPLETED) return current;
       throw new AppError("Appointment state changed; please retry", HTTP_STATUS.CONFLICT);
     }
+
+    await createNotificationIfEligible({
+      userId: appointment.patient.userId,
+      title: "Consultation completed",
+      message: "Your consultation has been marked as completed.",
+      notificationType: NotificationType.APPOINTMENT,
+      relatedEntityType: "Appointment",
+      relatedEntityId: appointment.id,
+    }, tx);
 
     return tx.appointment.findUniqueOrThrow({
       where: { id: appointment.id },
