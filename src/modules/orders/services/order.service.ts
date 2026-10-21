@@ -365,6 +365,7 @@ const updateOrderStatusForAdmin = async (
             select: {
                 status: true,
                 totalAmount: true,
+                patient: { select: { userId: true } },
                 items: { select: { inventoryId: true, quantity: true } },
                 payments: {
                     where: {
@@ -425,6 +426,15 @@ const updateOrderStatusForAdmin = async (
                 ...(input.reason && { metadata: { reason: input.reason } }),
             },
         });
+
+        await createNotification({
+            userId: existing.patient.userId,
+            title: "Order status updated",
+            message: `Your medicine order status is now ${input.status}.`,
+            notificationType: NotificationType.ORDER,
+            relatedEntityType: "Order",
+            relatedEntityId: orderId,
+        }, tx);
 
         return tx.order.findUniqueOrThrow({
             where: { id: orderId },
