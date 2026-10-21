@@ -59,4 +59,6 @@ apiRouter.use(
 
 apiRouter.use("/screenings", screeningRoutes);
 
+apiRouter.use("/api/doctors", doctorRoutes);
+
 export default apiRouter;
