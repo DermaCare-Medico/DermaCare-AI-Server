@@ -7,6 +7,7 @@ import swaggerUi from "swagger-ui-express";
 import { generateOpenApiSpec } from "./openapi-generator.js";
 import { ALL_ENDPOINTS } from "./endpoints/index.js";
 import { MODULES } from "./modules-data.js";
+import { ACTIVE_ENDPOINTS } from "./active-endpoints.js";
 
 const router = Router();
 
@@ -28,10 +29,12 @@ router.get("/api/v1/openapi.yaml", (_req, res, next) => {
 router.get("/api/v1/inventory", (_req, res) => {
   res.json({
     generatedAt: new Date().toISOString(),
-    totalEndpoints: ALL_ENDPOINTS.length,
+    totalEndpoints: ACTIVE_ENDPOINTS.length,
+    activeEndpoints: ACTIVE_ENDPOINTS,
+    proposedEndpointCount: ALL_ENDPOINTS.length,
     totalModules: MODULES.length,
     modules: MODULES,
-    endpoints: ALL_ENDPOINTS,
+    proposedEndpoints: ALL_ENDPOINTS,
   });
 });
 

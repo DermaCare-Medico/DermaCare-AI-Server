@@ -5,6 +5,7 @@ import * as yaml from 'yaml';
 import { generateOpenApiSpec } from './openapi-generator.js';
 import { ALL_ENDPOINTS } from './endpoints/index.js';
 import { MODULES } from './modules-data.js';
+import { ACTIVE_ENDPOINTS } from './active-endpoints.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,16 +33,18 @@ export function exportSpecification() {
   // Write inventory JSON for client-side rendering
   const inventoryData = {
     generatedAt: new Date().toISOString(),
-    totalEndpoints: ALL_ENDPOINTS.length,
+    totalEndpoints: ACTIVE_ENDPOINTS.length,
+    proposedEndpointCount: ALL_ENDPOINTS.length,
     totalModules: MODULES.length,
     countsByStatus: {
-      implementedAndVerified: ALL_ENDPOINTS.filter(e => e.implementationStatus === 'Implemented and verified').length,
+      implementedAndVerified: ACTIVE_ENDPOINTS.length,
       partiallyImplemented: ALL_ENDPOINTS.filter(e => e.implementationStatus === 'Partially implemented').length,
       specifiedButNotImplemented: ALL_ENDPOINTS.filter(e => e.implementationStatus === 'Specified but not implemented').length,
       requiresVerification: ALL_ENDPOINTS.filter(e => e.implementationStatus === 'Requires verification').length
     },
     modules: MODULES,
-    endpoints: ALL_ENDPOINTS
+    endpoints: ACTIVE_ENDPOINTS,
+    proposedEndpoints: ALL_ENDPOINTS
   };
 
   fs.writeFileSync(path.join(srcPublicDir, 'inventory.json'), JSON.stringify(inventoryData, null, 2), 'utf-8');
@@ -62,7 +65,7 @@ export function exportSpecification() {
   console.log(`   - ${path.join(rootDir, 'openapi.yaml')}`);
   console.log(`   - ${path.join(srcPublicDir, 'openapi.json')}`);
   console.log(`   - ${path.join(srcPublicDir, 'openapi.yaml')}`);
-  console.log(`   - ${path.join(srcPublicDir, 'inventory.json')} (${ALL_ENDPOINTS.length} endpoints)`);
+  console.log(`   - ${path.join(srcPublicDir, 'inventory.json')} (${ACTIVE_ENDPOINTS.length} active endpoints)`);
 
   return spec;
 }

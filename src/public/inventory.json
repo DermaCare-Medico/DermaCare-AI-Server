@@ -1,9 +1,10 @@
 {
-  "generatedAt": "2026-10-19T04:13:31.961Z",
-  "totalEndpoints": 84,
+  "generatedAt": "2026-10-21T05:06:09.456Z",
+  "totalEndpoints": 64,
+  "proposedEndpointCount": 84,
   "totalModules": 16,
   "countsByStatus": {
-    "implementedAndVerified": 0,
+    "implementedAndVerified": 64,
     "partiallyImplemented": 0,
     "specifiedButNotImplemented": 84,
     "requiresVerification": 0
@@ -218,6 +219,3518 @@
     }
   ],
   "endpoints": [
+    {
+      "id": 1000,
+      "method": "GET",
+      "path": "/health",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Health",
+      "summary": "Service health check",
+      "description": "Service health check. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        }
+      ]
+    },
+    {
+      "id": 1001,
+      "method": "POST",
+      "path": "/auth/register/request-otp",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Request registration OTP",
+      "description": "Request registration OTP. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "PATIENT",
+                "DOCTOR"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "password": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            },
+            "acceptTerms": {
+              "type": "boolean"
+            },
+            "acceptPrivacy": {
+              "type": "boolean"
+            },
+            "acceptHealthConsent": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "role",
+            "name",
+            "email",
+            "password",
+            "acceptTerms",
+            "acceptPrivacy",
+            "acceptHealthConsent"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 429,
+          "description": "Authentication rate limit exceeded."
+        }
+      ]
+    },
+    {
+      "id": 1002,
+      "method": "POST",
+      "path": "/auth/register/resend-otp",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Resend registration OTP",
+      "description": "Resend registration OTP. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          },
+          "required": [
+            "email"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 429,
+          "description": "Authentication rate limit exceeded."
+        }
+      ]
+    },
+    {
+      "id": 1003,
+      "method": "POST",
+      "path": "/auth/register/verify-otp",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Verify registration OTP",
+      "description": "Verify registration OTP. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "otp": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            }
+          },
+          "required": [
+            "email",
+            "otp"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 201,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 429,
+          "description": "Authentication rate limit exceeded."
+        }
+      ]
+    },
+    {
+      "id": 1004,
+      "method": "POST",
+      "path": "/auth/login",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Password login",
+      "description": "Password login. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "password": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "email",
+            "password"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Authentication credential or refresh token is invalid or expired."
+        },
+        {
+          "statusCode": 403,
+          "description": "Account is not active."
+        },
+        {
+          "statusCode": 429,
+          "description": "Authentication rate limit exceeded."
+        }
+      ]
+    },
+    {
+      "id": 1005,
+      "method": "POST",
+      "path": "/auth/google",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Google login or registration",
+      "description": "Google login or registration. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "idToken": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "PATIENT",
+                "DOCTOR"
+              ]
+            },
+            "acceptTerms": {
+              "type": "boolean"
+            },
+            "acceptPrivacy": {
+              "type": "boolean"
+            },
+            "acceptHealthConsent": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "idToken"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Authentication credential or refresh token is invalid or expired."
+        },
+        {
+          "statusCode": 403,
+          "description": "Account is not active."
+        },
+        {
+          "statusCode": 429,
+          "description": "Authentication rate limit exceeded."
+        }
+      ]
+    },
+    {
+      "id": 1006,
+      "method": "POST",
+      "path": "/auth/forgot-password/request-otp",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Request password-reset OTP",
+      "description": "Request password-reset OTP. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          },
+          "required": [
+            "email"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 429,
+          "description": "Authentication rate limit exceeded."
+        }
+      ]
+    },
+    {
+      "id": 1007,
+      "method": "POST",
+      "path": "/auth/forgot-password/verify-otp",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Verify password-reset OTP",
+      "description": "Verify password-reset OTP. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "otp": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "email",
+            "otp"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 429,
+          "description": "Authentication rate limit exceeded."
+        }
+      ]
+    },
+    {
+      "id": 1008,
+      "method": "POST",
+      "path": "/auth/forgot-password/reset",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Reset password",
+      "description": "Reset password. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "otp": {
+              "type": "string"
+            },
+            "newPassword": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "email",
+            "otp",
+            "newPassword"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 429,
+          "description": "Authentication rate limit exceeded."
+        }
+      ]
+    },
+    {
+      "id": 1009,
+      "method": "POST",
+      "path": "/auth/refresh",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Rotate refresh token",
+      "description": "Rotate refresh token. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "refreshToken": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "refreshToken"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Authentication credential or refresh token is invalid or expired."
+        },
+        {
+          "statusCode": 403,
+          "description": "Account is not active."
+        },
+        {
+          "statusCode": 429,
+          "description": "Authentication rate limit exceeded."
+        }
+      ]
+    },
+    {
+      "id": 1010,
+      "method": "POST",
+      "path": "/auth/logout",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Revoke refresh token",
+      "description": "Revoke refresh token. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "refreshToken": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "refreshToken"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 429,
+          "description": "Authentication rate limit exceeded."
+        }
+      ]
+    },
+    {
+      "id": 1011,
+      "method": "GET",
+      "path": "/auth/me",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Get signed-in account",
+      "description": "Get signed-in account. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT",
+        "DOCTOR",
+        "ADMIN",
+        "STORE_OWNER"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1012,
+      "method": "POST",
+      "path": "/auth/identities/google",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Link Google identity",
+      "description": "Link Google identity. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT",
+        "DOCTOR",
+        "ADMIN",
+        "STORE_OWNER"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "idToken": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "idToken"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1013,
+      "method": "DELETE",
+      "path": "/auth/identities/{provider}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Authentication",
+      "summary": "Unlink sign-in identity",
+      "description": "Unlink sign-in identity. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT",
+        "DOCTOR",
+        "ADMIN",
+        "STORE_OWNER"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "provider",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1014,
+      "method": "GET",
+      "path": "/medicines",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Store",
+      "summary": "List available medicines",
+      "description": "List available medicines. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "search",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        }
+      ]
+    },
+    {
+      "id": 1015,
+      "method": "GET",
+      "path": "/medicines/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Store",
+      "summary": "Get available medicine",
+      "description": "Get available medicine. This operation is mounted by the current Express application.",
+      "roles": [
+        "PUBLIC"
+      ],
+      "authRequired": false,
+      "authType": "None",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1016,
+      "method": "POST",
+      "path": "/appointments",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Appointments",
+      "summary": "Create Patient appointment",
+      "description": "Create Patient appointment. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "doctorId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "slotId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "screeningId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "historySharingConsent": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "doctorId",
+            "slotId"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 201,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1017,
+      "method": "GET",
+      "path": "/patients/me/appointments",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Appointments",
+      "summary": "List Patient appointments",
+      "description": "List Patient appointments. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Allowed values depend on the resource. Appointment: HELD, PENDING, CONFIRMED, CANCELLATION_REQUESTED, COMPLETED, CANCELLED, NO_SHOW; order: PENDING, CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED."
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1018,
+      "method": "GET",
+      "path": "/patients/me/appointments/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Appointments",
+      "summary": "Get Patient appointment and Meet provisioning state",
+      "description": "Get Patient appointment and Meet provisioning state. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1019,
+      "method": "GET",
+      "path": "/doctors/me/appointments/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Appointments",
+      "summary": "Get assigned Doctor appointment and Meet URL",
+      "description": "Get assigned Doctor appointment and Meet URL. This operation is mounted by the current Express application.",
+      "roles": [
+        "DOCTOR"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1020,
+      "method": "POST",
+      "path": "/appointments/{id}/payments",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Payments",
+      "summary": "Complete demo appointment payment",
+      "description": "Complete demo appointment payment. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [
+        "Demo payment only; no external payment gateway is charged.",
+        "Successful payment transitions are atomic and concurrency guarded."
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": false,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 201,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1021,
+      "method": "GET",
+      "path": "/appointments/{id}/payments",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Payments",
+      "summary": "Get appointment payment",
+      "description": "Get appointment payment. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [
+        "Demo payment only; no external payment gateway is charged.",
+        "Successful payment transitions are atomic and concurrency guarded."
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1022,
+      "method": "POST",
+      "path": "/orders/{id}/payments",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Payments",
+      "summary": "Complete demo medicine-order payment",
+      "description": "Complete demo medicine-order payment. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [
+        "Demo payment only; no external payment gateway is charged.",
+        "Successful payment transitions are atomic and concurrency guarded."
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string",
+              "enum": [
+                "BDT"
+              ]
+            }
+          },
+          "required": [
+            "amount",
+            "currency"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 201,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1023,
+      "method": "GET",
+      "path": "/orders/{id}/payments",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Payments",
+      "summary": "Get order payment",
+      "description": "Get order payment. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [
+        "Demo payment only; no external payment gateway is charged.",
+        "Successful payment transitions are atomic and concurrency guarded."
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1024,
+      "method": "POST",
+      "path": "/orders",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Orders",
+      "summary": "Place medicine order",
+      "description": "Place medicine order. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "deliveryAddress": {
+              "type": "string"
+            },
+            "prescriptionId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "medicineId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "quantity": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "deliveryAddress",
+            "items"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 201,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1025,
+      "method": "GET",
+      "path": "/patients/me/orders",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Orders",
+      "summary": "List Patient orders",
+      "description": "List Patient orders. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Allowed values depend on the resource. Appointment: HELD, PENDING, CONFIRMED, CANCELLATION_REQUESTED, COMPLETED, CANCELLED, NO_SHOW; order: PENDING, CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED."
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1026,
+      "method": "GET",
+      "path": "/patients/me/orders/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Orders",
+      "summary": "Get Patient order",
+      "description": "Get Patient order. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1027,
+      "method": "GET",
+      "path": "/patients/me/profile",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Patients",
+      "summary": "Get Patient profile",
+      "description": "Get Patient profile. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1028,
+      "method": "PATCH",
+      "path": "/patients/me/profile",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Patients",
+      "summary": "Update Patient profile",
+      "description": "Update Patient profile. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "dateOfBirth": {
+              "type": "string",
+              "format": "date"
+            },
+            "gender": {
+              "type": "string",
+              "enum": [
+                "MALE",
+                "FEMALE",
+                "OTHER",
+                "PREFER_NOT_TO_SAY"
+              ]
+            },
+            "address": {
+              "type": "string"
+            },
+            "allergies": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "existingConditions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1029,
+      "method": "GET",
+      "path": "/patients/me/dashboard",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Patients",
+      "summary": "Get Patient dashboard",
+      "description": "Get Patient dashboard. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1030,
+      "method": "GET",
+      "path": "/patients/me/medications",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Patients",
+      "summary": "List Patient medications",
+      "description": "List Patient medications. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1031,
+      "method": "POST",
+      "path": "/patients/me/medications",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Patients",
+      "summary": "Create Patient medication",
+      "description": "Create Patient medication. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "medicineName": {
+              "type": "string"
+            },
+            "dosage": {
+              "type": "string"
+            },
+            "frequency": {
+              "type": "string"
+            },
+            "startDate": {
+              "type": "string",
+              "format": "date"
+            },
+            "endDate": {
+              "type": "string",
+              "format": "date"
+            },
+            "notes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "medicineName"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 201,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1032,
+      "method": "PATCH",
+      "path": "/patients/me/medications/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Patients",
+      "summary": "Update Patient medication",
+      "description": "Update Patient medication. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "medicineName": {
+              "type": "string"
+            },
+            "dosage": {
+              "type": "string"
+            },
+            "frequency": {
+              "type": "string"
+            },
+            "startDate": {
+              "type": "string",
+              "format": "date"
+            },
+            "endDate": {
+              "type": "string",
+              "format": "date"
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1033,
+      "method": "DELETE",
+      "path": "/patients/me/medications/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Patients",
+      "summary": "Delete Patient medication",
+      "description": "Delete Patient medication. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1034,
+      "method": "GET",
+      "path": "/patients/me/prescriptions",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Patients",
+      "summary": "List finalized Patient prescriptions",
+      "description": "List finalized Patient prescriptions. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1035,
+      "method": "GET",
+      "path": "/patients/me/prescriptions/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Patients",
+      "summary": "Get finalized Patient prescription",
+      "description": "Get finalized Patient prescription. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1036,
+      "method": "GET",
+      "path": "/notifications",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Notifications",
+      "summary": "List own notifications",
+      "description": "List own notifications. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT",
+        "DOCTOR",
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "isRead",
+          "in": "query",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1037,
+      "method": "GET",
+      "path": "/notifications/unread-count",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Notifications",
+      "summary": "Get unread notification count",
+      "description": "Get unread notification count. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT",
+        "DOCTOR",
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1038,
+      "method": "PATCH",
+      "path": "/notifications/read-all",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Notifications",
+      "summary": "Mark all own notifications read",
+      "description": "Mark all own notifications read. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT",
+        "DOCTOR",
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1039,
+      "method": "PATCH",
+      "path": "/notifications/{id}/read",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Notifications",
+      "summary": "Mark own notification read",
+      "description": "Mark own notification read. This operation is mounted by the current Express application.",
+      "roles": [
+        "PATIENT",
+        "DOCTOR",
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1040,
+      "method": "GET",
+      "path": "/users/me",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Get Admin profile",
+      "description": "Get Admin profile. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1041,
+      "method": "PATCH",
+      "path": "/users/me",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Update Admin profile",
+      "description": "Update Admin profile. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            }
+          }
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1042,
+      "method": "GET",
+      "path": "/admin/dashboard",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Get Admin dashboard",
+      "description": "Get Admin dashboard. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1043,
+      "method": "GET",
+      "path": "/admin/doctor-payments",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "List Doctor payouts",
+      "description": "List Doctor payouts. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Allowed values depend on the resource. Appointment: HELD, PENDING, CONFIRMED, CANCELLATION_REQUESTED, COMPLETED, CANCELLED, NO_SHOW; order: PENDING, CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED."
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1044,
+      "method": "POST",
+      "path": "/admin/doctor-payments/{id}/send",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Send demo Doctor payout",
+      "description": "Send demo Doctor payout. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1045,
+      "method": "GET",
+      "path": "/admin/orders",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "List orders",
+      "description": "List orders. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Allowed values depend on the resource. Appointment: HELD, PENDING, CONFIRMED, CANCELLATION_REQUESTED, COMPLETED, CANCELLED, NO_SHOW; order: PENDING, CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED."
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1046,
+      "method": "GET",
+      "path": "/admin/orders/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Get order",
+      "description": "Get order. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1047,
+      "method": "PATCH",
+      "path": "/admin/orders/{id}/status",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Update order status",
+      "description": "Update order status. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "PROCESSING",
+                "PACKED",
+                "OUT_FOR_DELIVERY",
+                "DELIVERED",
+                "CANCELLED"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1048,
+      "method": "GET",
+      "path": "/admin/users",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "List users",
+      "description": "List users. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "search",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "role",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Allowed values depend on the resource. Appointment: HELD, PENDING, CONFIRMED, CANCELLATION_REQUESTED, COMPLETED, CANCELLED, NO_SHOW; order: PENDING, CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED."
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1049,
+      "method": "GET",
+      "path": "/admin/users/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Get user",
+      "description": "Get user. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1050,
+      "method": "PATCH",
+      "path": "/admin/users/{id}/status",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Update user status",
+      "description": "Update user status. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "SUSPENDED"
+              ]
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1051,
+      "method": "GET",
+      "path": "/admin/doctors",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "List Doctors",
+      "description": "List Doctors. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "search",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "specialization",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Allowed values depend on the resource. Appointment: HELD, PENDING, CONFIRMED, CANCELLATION_REQUESTED, COMPLETED, CANCELLED, NO_SHOW; order: PENDING, CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED."
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1052,
+      "method": "GET",
+      "path": "/admin/doctors/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Get Doctor",
+      "description": "Get Doctor. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1053,
+      "method": "GET",
+      "path": "/admin/doctor-approvals",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "List pending Doctor approvals",
+      "description": "List pending Doctor approvals. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1054,
+      "method": "POST",
+      "path": "/admin/doctor-approvals/{id}/approve",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Approve Doctor",
+      "description": "Approve Doctor. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": false,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1055,
+      "method": "POST",
+      "path": "/admin/doctor-approvals/{id}/reject",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Reject Doctor",
+      "description": "Reject Doctor. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reason"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1056,
+      "method": "GET",
+      "path": "/admin/medicines",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "List medicines",
+      "description": "List medicines. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "search",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "lowStock",
+          "in": "query",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "isAvailable",
+          "in": "query",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1057,
+      "method": "POST",
+      "path": "/admin/medicines",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Create medicine",
+      "description": "Create medicine. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "strength": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "price": {
+              "type": "number"
+            },
+            "stockQuantity": {
+              "type": "integer"
+            },
+            "requiresPrescription": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "price",
+            "stockQuantity",
+            "requiresPrescription"
+          ]
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 201,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1058,
+      "method": "GET",
+      "path": "/admin/medicines/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Get medicine",
+      "description": "Get medicine. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1059,
+      "method": "PATCH",
+      "path": "/admin/medicines/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Update medicine",
+      "description": "Update medicine. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "requestBody": {
+        "description": "JSON request body",
+        "required": true,
+        "contentType": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "strength": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "price": {
+              "type": "number"
+            },
+            "stockQuantity": {
+              "type": "integer"
+            },
+            "requiresPrescription": {
+              "type": "boolean"
+            },
+            "isAvailable": {
+              "type": "boolean"
+            }
+          }
+        },
+        "example": {}
+      },
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        },
+        {
+          "statusCode": 409,
+          "description": "State conflict, duplicate resource, or concurrent transition."
+        }
+      ]
+    },
+    {
+      "id": 1060,
+      "method": "DELETE",
+      "path": "/admin/medicines/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Deactivate medicine",
+      "description": "Deactivate medicine. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1061,
+      "method": "GET",
+      "path": "/admin/appointments",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "List appointments",
+      "description": "List appointments. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Allowed values depend on the resource. Appointment: HELD, PENDING, CONFIRMED, CANCELLATION_REQUESTED, COMPLETED, CANCELLED, NO_SHOW; order: PENDING, CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED."
+        },
+        {
+          "name": "doctorId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "name": "patientId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    },
+    {
+      "id": 1062,
+      "method": "GET",
+      "path": "/admin/appointments/{id}",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "Get appointment",
+      "description": "Get appointment. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        },
+        {
+          "statusCode": 404,
+          "description": "Resource not found or not owned by the caller."
+        }
+      ]
+    },
+    {
+      "id": 1063,
+      "method": "GET",
+      "path": "/admin/audit-logs",
+      "moduleNumber": "ACTIVE",
+      "moduleName": "Admin",
+      "summary": "List audit logs",
+      "description": "List audit logs. This operation is mounted by the current Express application.",
+      "roles": [
+        "ADMIN"
+      ],
+      "authRequired": true,
+      "authType": "BearerAuth",
+      "implementationStatus": "Implemented and verified",
+      "businessRules": [],
+      "parameters": [
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "dateFrom",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "dateTo",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "actorUserId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "name": "action",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "entityType",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "entityId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "format": "uuid"
+        }
+      ],
+      "responses": [
+        {
+          "statusCode": 200,
+          "description": "Operation completed successfully."
+        },
+        {
+          "statusCode": 400,
+          "description": "Request validation or business-rule failure."
+        },
+        {
+          "statusCode": 401,
+          "description": "Missing, invalid, expired, or deleted-account access token."
+        },
+        {
+          "statusCode": 403,
+          "description": "Inactive account or insufficient role."
+        }
+      ]
+    }
+  ],
+  "proposedEndpoints": [
     {
       "id": 1,
       "method": "POST",
@@ -4510,9 +8023,11 @@
           "required": false,
           "type": "string",
           "enum": [
-            "PENDING_PAYMENT",
+            "PENDING",
+            "CONFIRMED",
             "PROCESSING",
-            "SHIPPED",
+            "PACKED",
+            "OUT_FOR_DELIVERY",
             "DELIVERED",
             "CANCELLED"
           ],
@@ -5403,7 +8918,7 @@
       "businessRules": [
         "Contract rule: Combines list and detail retrieval under a single endpoint (?id=...).",
         "Admin only.",
-        "Supports filtering by status (PENDING_PAYMENT, PROCESSING, SHIPPED, DELIVERED, CANCELLED)."
+        "Supports filtering by status (PENDING, CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED)."
       ],
       "parameters": [
         {
@@ -5486,7 +9001,7 @@
       "statusNotes": "Specified in MVP contract. Backend route not yet implemented in repository.",
       "businessRules": [
         "Admin only.",
-        "Allowed status values: PROCESSING, SHIPPED, DELIVERED, CANCELLED.",
+        "Allowed status values: CONFIRMED, PROCESSING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED.",
         "Atomic stock transaction: If status transitions to CANCELLED, reserved stock is automatically returned to inventory."
       ],
       "parameters": [
@@ -5512,12 +9027,14 @@
             "status": {
               "type": "string",
               "enum": [
+                "CONFIRMED",
                 "PROCESSING",
-                "SHIPPED",
+                "PACKED",
+                "OUT_FOR_DELIVERY",
                 "DELIVERED",
                 "CANCELLED"
               ],
-              "example": "SHIPPED"
+              "example": "OUT_FOR_DELIVERY"
             },
             "trackingNumber": {
               "type": "string",
@@ -5530,7 +9047,7 @@
           }
         },
         "example": {
-          "status": "SHIPPED",
+          "status": "OUT_FOR_DELIVERY",
           "trackingNumber": "TRK-992147-US",
           "carrier": "FedEx Express"
         }
@@ -5543,7 +9060,7 @@
             "success": true,
             "data": {
               "orderId": "ord_990182",
-              "status": "SHIPPED",
+              "status": "OUT_FOR_DELIVERY",
               "trackingNumber": "TRK-992147-US",
               "updatedAt": "2026-10-15T14:30:00Z"
             }
