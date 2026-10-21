@@ -77,6 +77,16 @@ enum AppointmentStatus {
   @@map("appointment_status")
 }
 
+enum MeetingProvisioningStatus {
+  NOT_REQUESTED
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+
+  @@map("meeting_provisioning_status")
+}
+
 enum ScreeningStatus {
   PENDING
   PROCESSING

@@ -28,6 +28,13 @@ const envSchema = z
     // Google authentication (optional until implemented)
     GOOGLE_CLIENT_ID: optionalString,
 
+    // Google Calendar / Meet (optional; failures remain retryable)
+    GOOGLE_CALENDAR_CLIENT_ID: optionalString,
+    GOOGLE_CALENDAR_CLIENT_SECRET: optionalString,
+    GOOGLE_CALENDAR_REDIRECT_URI: optionalString,
+    GOOGLE_CALENDAR_REFRESH_TOKEN: optionalString,
+    GOOGLE_CALENDAR_ID: z.string().default("primary"),
+
     // SMTP email configuration
     SMTP_HOST: optionalString,
     SMTP_PORT: z.coerce.number().int().positive().default(587),

@@ -9,6 +9,7 @@ import {
     Role,
     TransactionPurpose,
     TransactionStatus,
+    MeetingProvisioningStatus,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
@@ -18,6 +19,7 @@ import {
     isMatchingOrderPayment,
     isOrderPaymentExpired,
 } from "../../orders/services/order-payment.rules.js";
+import { requestMeetingProvisioning } from "../../../integrations/google-calendar/meeting-provisioning.worker.js";
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -51,7 +53,7 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
     const patient = await getActivePatient(userId);
 
     try {
-        return await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             const appointment = await tx.appointment.findFirst({
                 where: {
                     id: appointmentId,
@@ -111,6 +113,9 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
                 },
                 data: {
                     status: AppointmentStatus.CONFIRMED,
+                    meetingProvisioningStatus: MeetingProvisioningStatus.PENDING,
+                    meetingProvisioningNextAttemptAt: new Date(),
+                    meetingProvisioningError: null,
                 },
             });
 
@@ -154,6 +159,8 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
         }, {
             isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
         });
+        requestMeetingProvisioning();
+        return result;
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError
             && (error.code === "P2002" || error.code === "P2034")) {

@@ -79,7 +79,7 @@ model DoctorPayout {
   createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  doctor DoctorProfile     @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  doctor DoctorProfile      @relation(fields: [doctorId], references: [id], onDelete: Restrict)
   items  DoctorPayoutItem[]
 
   @@unique([doctorId, periodStart, periodEnd])
@@ -88,13 +88,13 @@ model DoctorPayout {
 }
 
 model DoctorPayoutItem {
-  id                  String   @id @default(uuid()) @db.Uuid
-  payoutId            String   @map("payout_id") @db.Uuid
-  appointmentId       String   @unique @map("appointment_id") @db.Uuid
-  consultationAmount  Decimal  @map("consultation_amount") @db.Decimal(10, 2)
-  platformFee         Decimal  @default(0) @map("platform_fee") @db.Decimal(10, 2)
-  doctorAmount        Decimal  @map("doctor_amount") @db.Decimal(10, 2)
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  id                 String   @id @default(uuid()) @db.Uuid
+  payoutId           String   @map("payout_id") @db.Uuid
+  appointmentId      String   @unique @map("appointment_id") @db.Uuid
+  consultationAmount Decimal  @map("consultation_amount") @db.Decimal(10, 2)
+  platformFee        Decimal  @default(0) @map("platform_fee") @db.Decimal(10, 2)
+  doctorAmount       Decimal  @map("doctor_amount") @db.Decimal(10, 2)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamp(6)
 
   payout      DoctorPayout @relation(fields: [payoutId], references: [id], onDelete: Restrict)
   appointment Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Restrict)

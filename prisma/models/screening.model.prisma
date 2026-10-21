@@ -1,13 +1,13 @@
 model Screening {
-  id                 String             @id @default(uuid()) @db.Uuid
-  patientId          String             @map("patient_id") @db.Uuid
+  id                 String              @id @default(uuid()) @db.Uuid
+  patientId          String              @map("patient_id") @db.Uuid
   symptoms           String?
   imageQualityStatus ImageQualityStatus? @map("image_quality_status")
-  riskLevel          RiskCategory?      @map("risk_level")
-  redFlagDetected    Boolean            @default(false) @map("red_flag_detected")
-  aiStatus           ScreeningStatus    @default(PENDING) @map("ai_status")
+  riskLevel          RiskCategory?       @map("risk_level")
+  redFlagDetected    Boolean             @default(false) @map("red_flag_detected")
+  aiStatus           ScreeningStatus     @default(PENDING) @map("ai_status")
   disclaimer         String?
-  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamp(6)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamp(6)
 
   patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
 
