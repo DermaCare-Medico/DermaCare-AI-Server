@@ -4,7 +4,7 @@ import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.middleware.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
 import { uploadScreeningImage } from "../../middlewares/upload.middleware.js";
-import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 
 import { uploadScreeningImageController } from "./controllers/screening-image.controller.js";
 import {

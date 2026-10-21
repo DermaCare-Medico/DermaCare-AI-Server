@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { validateRequest } from "../../middlewares/validateRequest.js";
+import { validateRequest } from "../../middlewares/validateRequest.middleware.js";
 import { uuidSchema } from "../../shared/validators/common.validator.js";
 
 export type PublicMedicineListQuery = {

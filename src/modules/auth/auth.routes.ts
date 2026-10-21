@@ -7,7 +7,7 @@ import {
   otpSendLimiter,
   otpVerifyLimiter,
   passwordResetLimiter,
-} from "../../middlewares/rateLimiter.js";
+} from "../../middlewares/rateLimiter.middleware.js";
 import { authController } from "./auth.controller.js";
 
 const { registration, login, password, session, account } = authController;
