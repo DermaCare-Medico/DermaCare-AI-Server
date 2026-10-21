@@ -17,6 +17,7 @@ import type {
 } from "../appointments.validation.js";
 import type { AdminAppointmentListQuery } from "../../admin/admin.validation.js";
 import { requireActiveAdmin } from "../../admin/services/admin.service.js";
+import { canExposeMeeting } from "../../../integrations/google-calendar/meeting-access.rules.js";
 
 const httpError = (statusCode: number, message: string) => new AppError(message, statusCode);
 
@@ -42,6 +43,7 @@ const appointmentSelect = {
     screeningId: true,
     historySharingConsent: true,
     videoLink: true,
+    meetingProvisioningStatus: true,
     cancellationReason: true,
     createdAt: true,
     updatedAt: true,
@@ -82,9 +84,7 @@ type SelectedAppointment = Prisma.AppointmentGetPayload<{ select: typeof appoint
 
 const presentAppointment = (appointment: SelectedAppointment, includeDetails = false) => {
     const paymentStatus = appointment.payments[0]?.status ?? null;
-    const canViewConsultation = paymentStatus === TransactionStatus.PAID
-        && (appointment.status === AppointmentStatus.CONFIRMED
-            || appointment.status === AppointmentStatus.COMPLETED);
+    const canViewConsultation = canExposeMeeting(appointment.status, paymentStatus);
 
     return {
         id: appointment.id,
@@ -106,6 +106,9 @@ const presentAppointment = (appointment: SelectedAppointment, includeDetails = f
         paymentStatus,
         prescriptionSent: appointment.prescription?.sentAt != null,
         videoLink: canViewConsultation ? appointment.videoLink : null,
+        meetingProvisioningStatus: canViewConsultation
+            ? appointment.meetingProvisioningStatus
+            : "NOT_REQUESTED",
         ...(includeDetails && {
             screening: appointment.screening,
             historySharingConsent: appointment.historySharingConsent,
@@ -241,6 +244,22 @@ const getMyAppointmentById = async (userId: string, appointmentId: string) => {
     return presentAppointment(appointment, true);
 };
 
+const getDoctorAppointmentById = async (userId: string, appointmentId: string) => {
+    const appointment = await prisma.appointment.findFirst({
+        where: {
+            id: appointmentId,
+            doctor: {
+                userId,
+                approvalStatus: DoctorApprovalStatus.APPROVED,
+                user: { status: AccountStatus.ACTIVE, deletedAt: null },
+            },
+        },
+        select: appointmentSelect,
+    });
+    if (!appointment) throw httpError(404, "Appointment not found");
+    return presentAppointment(appointment, true);
+};
+
 const adminAppointmentSelect = {
     id: true,
     status: true,
@@ -317,6 +336,7 @@ export const appointmentService = {
     createAppointment,
     getMyAppointments,
     getMyAppointmentById,
+    getDoctorAppointmentById,
     listAppointmentsForAdmin,
     getAppointmentForAdmin,
 };

@@ -3,11 +3,13 @@ import {
     DoctorApprovalStatus,
     PayoutStatus,
     Prisma,
+    NotificationType,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import type { AdminPayoutListQuery } from "../admin.validation.js";
 import { requireActiveAdmin } from "./admin.service.js";
+import { createNotification } from "../../notifications/services/notification.service.js";
 
 const payoutSelect = {
     id: true,
@@ -72,7 +74,7 @@ const sendPayout = async (adminUserId: string, payoutId: string) => {
                 doctor: {
                     select: {
                         approvalStatus: true,
-                        user: { select: { status: true, deletedAt: true } },
+                        user: { select: { id: true, status: true, deletedAt: true } },
                     },
                 },
             },
@@ -94,16 +96,42 @@ const sendPayout = async (adminUserId: string, payoutId: string) => {
         }
 
         const paidAt = new Date();
+        const transactionReference = `DEMO-${payoutId}-${paidAt.getTime()}`;
         const updated = await tx.doctorPayout.updateMany({
             where: { id: payoutId, status: PayoutStatus.PENDING },
             data: {
                 status: PayoutStatus.PAID,
                 paidAt,
-                transactionReference: `DEMO-${payoutId}-${paidAt.getTime()}`,
+                transactionReference,
             },
         });
 
         if (updated.count !== 1) throw new AppError("Payout has already been processed", 409);
+
+        await tx.auditLog.create({
+            data: {
+                actorUserId: adminUserId,
+                action: "DOCTOR_PAYOUT_SENT",
+                entityType: "DoctorPayout",
+                entityId: payoutId,
+                before: { status: PayoutStatus.PENDING },
+                after: {
+                    status: PayoutStatus.PAID,
+                    paidAt,
+                    transactionReference,
+                },
+                metadata: { netAmount: payout.netAmount.toString() },
+            },
+        });
+
+        await createNotification({
+            userId: payout.doctor.user.id,
+            title: "Doctor payout successful",
+            message: "Your doctor payout was processed successfully.",
+            notificationType: NotificationType.PAYMENT,
+            relatedEntityType: "DoctorPayout",
+            relatedEntityId: payoutId,
+        }, tx);
 
         return tx.doctorPayout.findUniqueOrThrow({
             where: { id: payoutId },

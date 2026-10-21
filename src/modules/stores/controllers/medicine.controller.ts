@@ -41,6 +41,7 @@ const listMedicinesForAdmin = async (req: Request, res: Response) => {
         limit: Number(req.query.limit),
         search: req.query.search as string | undefined,
         lowStock: req.query.lowStock as boolean | undefined,
+        isAvailable: req.query.isAvailable as boolean | undefined,
     });
     return res.status(HTTP_STATUS.OK).json({
         success: true,

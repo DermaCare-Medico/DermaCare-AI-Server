@@ -436,7 +436,7 @@ export const STORE_ENDPOINTS: EndpointSpec[] = [
     ],
     parameters: [
       { name: 'id', in: 'query', required: false, type: 'string', description: 'Order ID to retrieve single order detail', example: 'ord_990182' },
-      { name: 'status', in: 'query', required: false, type: 'string', enum: ['PENDING_PAYMENT', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'], example: 'PROCESSING' },
+      { name: 'status', in: 'query', required: false, type: 'string', enum: ['PENDING', 'CONFIRMED', 'PROCESSING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'], example: 'PROCESSING' },
       { name: 'page', in: 'query', required: false, type: 'integer', example: 1 },
       { name: 'limit', in: 'query', required: false, type: 'integer', example: 10 }
     ],

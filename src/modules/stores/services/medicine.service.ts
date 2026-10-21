@@ -8,12 +8,14 @@ import type {
 import { requireActiveAdmin } from "../../admin/services/admin.service.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import type { PublicMedicineListQuery } from "../stores.validation.js";
+import { env } from "../../../config/env.js";
 
-const LOW_STOCK_MAXIMUM = 10;
+const LOW_STOCK_MAXIMUM = env.LOW_STOCK_THRESHOLD;
 
 const medicineSelect = {
     id: true,
     name: true,
+    strength: true,
     description: true,
     requiresPrescription: true,
     isVerified: true,
@@ -34,6 +36,7 @@ const medicineSelect = {
 const publicMedicineSelect = {
     id: true,
     name: true,
+    strength: true,
     description: true,
     requiresPrescription: true,
     inventory: {
@@ -50,6 +53,7 @@ type PublicMedicineRecord = Prisma.MedicineGetPayload<{
 const presentPublicMedicine = (medicine: PublicMedicineRecord) => ({
     id: medicine.id,
     name: medicine.name,
+    strength: medicine.strength,
     description: medicine.description,
     requiresPrescription: medicine.requiresPrescription,
     price: medicine.inventory[0]!.price,
@@ -62,6 +66,7 @@ const publicMedicineWhere = (search?: string): Prisma.MedicineWhereInput => ({
     ...(search && {
         OR: [
             { name: { contains: search, mode: "insensitive" } },
+            { strength: { contains: search, mode: "insensitive" } },
             { description: { contains: search, mode: "insensitive" } },
         ],
     }),
@@ -109,12 +114,15 @@ const listMedicinesForAdmin = async (
         ...(query.search && {
             OR: [
                 { name: { contains: query.search, mode: "insensitive" } },
+                { strength: { contains: query.search, mode: "insensitive" } },
                 { description: { contains: query.search, mode: "insensitive" } },
             ],
         }),
         inventory: {
             some: {
-                isAvailable: true,
+                ...(query.isAvailable !== undefined && {
+                    isAvailable: query.isAvailable,
+                }),
                 ...(query.lowStock !== undefined && {
                     stockQuantity: query.lowStock
                         ? { lte: LOW_STOCK_MAXIMUM }
@@ -152,6 +160,7 @@ const createMedicineForAdmin = async (adminUserId: string, input: CreateMedicine
         const medicine = await tx.medicine.create({
             data: {
                 name: input.name,
+                strength: input.strength,
                 description: input.description,
                 requiresPrescription: input.requiresPrescription,
                 isVerified: true,
@@ -176,6 +185,7 @@ const createMedicineForAdmin = async (adminUserId: string, input: CreateMedicine
                 entityId: medicine.id,
                 after: {
                     name: input.name,
+                    strength: input.strength,
                     price: input.price,
                     stockQuantity: input.stockQuantity,
                     requiresPrescription: input.requiresPrescription,
@@ -208,6 +218,7 @@ const updateMedicineForAdmin = async (
             where: { id: medicineId },
             select: {
                 name: true,
+                strength: true,
                 description: true,
                 requiresPrescription: true,
                 inventory: {
@@ -218,13 +229,21 @@ const updateMedicineForAdmin = async (
         if (!existing) throw new AppError("Medicine not found", 404);
 
         const inventory = existing.inventory[0];
-        const changesInventory = input.price !== undefined || input.stockQuantity !== undefined;
+        const changesInventory = input.price !== undefined
+            || input.stockQuantity !== undefined
+            || input.isAvailable !== undefined;
         if (changesInventory && !inventory) {
             throw new AppError("Medicine inventory not found", 409);
         }
 
+        const effectiveStock = input.stockQuantity ?? inventory?.stockQuantity ?? 0;
+        if (input.isAvailable === true && effectiveStock <= 0) {
+            throw new AppError("Medicine cannot be activated without stock", 400);
+        }
+
         if (
             input.name !== undefined
+            || input.strength !== undefined
             || input.description !== undefined
             || input.requiresPrescription !== undefined
         ) {
@@ -232,6 +251,7 @@ const updateMedicineForAdmin = async (
                 where: { id: medicineId },
                 data: {
                     ...(input.name !== undefined && { name: input.name }),
+                    ...(input.strength !== undefined && { strength: input.strength }),
                     ...(input.description !== undefined && { description: input.description }),
                     ...(input.requiresPrescription !== undefined && {
                         requiresPrescription: input.requiresPrescription,
@@ -247,8 +267,11 @@ const updateMedicineForAdmin = async (
                     ...(input.price !== undefined && { price: input.price }),
                     ...(input.stockQuantity !== undefined && {
                         stockQuantity: input.stockQuantity,
-                        isAvailable: input.stockQuantity > 0,
                     }),
+                    ...(input.isAvailable !== undefined && {
+                        isAvailable: input.isAvailable,
+                    }),
+                    ...(input.stockQuantity === 0 && { isAvailable: false }),
                 },
             });
         }
@@ -261,10 +284,12 @@ const updateMedicineForAdmin = async (
                 entityId: medicineId,
                 before: {
                     name: existing.name,
+                    strength: existing.strength,
                     description: existing.description,
                     requiresPrescription: existing.requiresPrescription,
                     price: inventory?.price.toString() ?? null,
                     stockQuantity: inventory?.stockQuantity ?? null,
+                    isAvailable: inventory?.isAvailable ?? null,
                 },
                 after: input,
             },

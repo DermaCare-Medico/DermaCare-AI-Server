@@ -53,10 +53,12 @@ export type AdminMedicineListQuery = {
     limit: number;
     search?: string;
     lowStock?: boolean;
+    isAvailable?: boolean;
 };
 
 export type CreateMedicineInput = {
     name: string;
+    strength?: string;
     description?: string;
     price: number;
     stockQuantity: number;
@@ -65,10 +67,12 @@ export type CreateMedicineInput = {
 
 export type UpdateMedicineInput = {
     name?: string;
+    strength?: string | null;
     description?: string | null;
     price?: number;
     stockQuantity?: number;
     requiresPrescription?: boolean;
+    isAvailable?: boolean;
 };
 
 export type AdminAppointmentListQuery = {
@@ -113,7 +117,8 @@ const orderStatusSchema = z.object({
     status: z.enum([
         OrderStatus.CONFIRMED,
         OrderStatus.PROCESSING,
-        OrderStatus.SHIPPED,
+        OrderStatus.PACKED,
+        OrderStatus.OUT_FOR_DELIVERY,
         OrderStatus.DELIVERED,
         OrderStatus.CANCELLED,
     ]),
@@ -169,10 +174,12 @@ const medicineListQuerySchema = z.object({
     ...paginationShape,
     search: z.string().trim().min(1).max(200).optional(),
     lowStock: booleanQueryValue.optional(),
+    isAvailable: booleanQueryValue.optional(),
 }).strict();
 
 const createMedicineSchema = z.object({
     name: z.string().trim().min(2).max(200),
+    strength: z.string().trim().min(1).max(100).optional(),
     description: z.string().trim().min(1).max(2000).optional(),
     price: z.coerce.number().positive().max(99999999.99),
     stockQuantity: z.coerce.number().int().min(0),
@@ -183,10 +190,12 @@ const medicineIdParamsSchema = z.object({ id: uuidSchema }).strict();
 
 const updateMedicineSchema = z.object({
     name: z.string().trim().min(2).max(200).optional(),
+    strength: z.string().trim().min(1).max(100).nullable().optional(),
     description: z.string().trim().min(1).max(2000).nullable().optional(),
     price: z.coerce.number().positive().max(99999999.99).optional(),
     stockQuantity: z.coerce.number().int().min(0).optional(),
     requiresPrescription: z.boolean().optional(),
+    isAvailable: z.boolean().optional(),
 }).strict().refine(
     (value) => Object.values(value).some((item) => item !== undefined),
     { message: "At least one medicine field is required" },

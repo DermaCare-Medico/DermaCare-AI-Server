@@ -12,6 +12,17 @@ const getUserId = (req: Request) => {
     return userId;
 };
 
+const listMyMedicationsController = async (req: Request, res: Response) => {
+    const medications = await medicationService.listMyMedications(getUserId(req));
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Medications retrieved successfully",
+        data: medications,
+    });
+};
+
 const createMyMedicationController = async (req: Request, res: Response) => {
     const medication = await medicationService.createMyMedication(
         getUserId(req),
@@ -56,6 +67,7 @@ const deactivateMyMedicationController = async (req: Request, res: Response) => 
 };
 
 export const medicationController = {
+    listMyMedicationsController,
     createMyMedicationController,
     updateMyMedicationController,
     deactivateMyMedicationController,

@@ -26,6 +26,7 @@ model DoctorProfile {
   ratingCount      Int                  @default(0) @map("rating_count")
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamp(6)
+
   appointments     Appointment[]
   conversations    Conversation[]
   payouts          DoctorPayout[]
@@ -60,22 +61,23 @@ model DoctorSlot {
 }
 
 model DoctorPayout {
-  id                   String             @id @default(uuid()) @db.Uuid
-  doctorId             String             @map("doctor_id") @db.Uuid
-  periodStart          DateTime           @map("period_start") @db.Date
-  periodEnd            DateTime           @map("period_end") @db.Date
-  totalConsultations   Int                @default(0) @map("total_consultations")
-  grossAmount          Decimal            @map("gross_amount") @db.Decimal(10, 2)
-  platformFee          Decimal            @default(0) @map("platform_fee") @db.Decimal(10, 2)
-  netAmount            Decimal            @map("net_amount") @db.Decimal(10, 2)
-  status               PayoutStatus       @default(PENDING)
-  paidAt               DateTime?          @map("paid_at") @db.Timestamp(6)
-  transactionReference String?            @map("transaction_reference") @db.VarChar(255)
+  id                   String        @id @default(uuid()) @db.Uuid
+  doctorId             String        @map("doctor_id") @db.Uuid
+  periodStart          DateTime      @map("period_start") @db.Date
+  periodEnd            DateTime      @map("period_end") @db.Date
+  totalConsultations   Int           @default(0) @map("total_consultations")
+  grossAmount          Decimal       @map("gross_amount") @db.Decimal(10, 2)
+  platformFee          Decimal       @default(0) @map("platform_fee") @db.Decimal(10, 2)
+  netAmount            Decimal       @map("net_amount") @db.Decimal(10, 2)
+  status               PayoutStatus  @default(PENDING)
+  paidAt               DateTime?     @map("paid_at") @db.Timestamp(6)
+  transactionReference String?       @map("transaction_reference") @db.VarChar(255)
   notes                String?
-  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamp(6)
-  items                DoctorPayoutItem[]
-  doctor               DoctorProfile      @relation(fields: [doctorId], references: [id])
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  doctor DoctorProfile      @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  items  DoctorPayoutItem[]
 
   @@unique([doctorId, periodStart, periodEnd])
   @@index([status])
@@ -83,15 +85,16 @@ model DoctorPayout {
 }
 
 model DoctorPayoutItem {
-  id                 String       @id @default(uuid()) @db.Uuid
-  payoutId           String       @map("payout_id") @db.Uuid
-  appointmentId      String       @unique @map("appointment_id") @db.Uuid
-  consultationAmount Decimal      @map("consultation_amount") @db.Decimal(10, 2)
-  platformFee        Decimal      @default(0) @map("platform_fee") @db.Decimal(10, 2)
-  doctorAmount       Decimal      @map("doctor_amount") @db.Decimal(10, 2)
-  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
-  appointment        Appointment  @relation(fields: [appointmentId], references: [id])
-  payout             DoctorPayout @relation(fields: [payoutId], references: [id])
+  id                 String   @id @default(uuid()) @db.Uuid
+  payoutId           String   @map("payout_id") @db.Uuid
+  appointmentId      String   @unique @map("appointment_id") @db.Uuid
+  consultationAmount Decimal  @map("consultation_amount") @db.Decimal(10, 2)
+  platformFee        Decimal  @default(0) @map("platform_fee") @db.Decimal(10, 2)
+  doctorAmount       Decimal  @map("doctor_amount") @db.Decimal(10, 2)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  payout      DoctorPayout @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+  appointment Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
 
   @@index([payoutId])
   @@map("doctor_payout_items")

@@ -1,10 +1,11 @@
 import { ALL_ENDPOINTS } from './endpoints/index.js';
+import { ACTIVE_ENDPOINTS } from './active-endpoints.js';
 import { MODULES } from './modules-data.js';
 
 export function generateOpenApiSpec() {
   const paths: Record<string, any> = {};
 
-  for (const ep of ALL_ENDPOINTS) {
+  for (const ep of ACTIVE_ENDPOINTS) {
     if (!paths[ep.path]) {
       paths[ep.path] = {};
     }
@@ -140,11 +141,11 @@ export function generateOpenApiSpec() {
     openapi: '3.0.3',
     info: {
       title: 'DermaCare AI API Reference',
-      version: '1.0.0-proposed',
+      version: '1.0.0',
       description: `
-# DermaCare AI — Optimized MVP REST API Specification
+# DermaCare AI — Implemented REST API
 
-Welcome to the **DermaCare AI API Developer Documentation Portal**. DermaCare AI is a comprehensive, clinical-grade dermatological healthcare platform serving **Patients**, **Doctors**, and **Administrators**.
+This document contains only operations mounted by the current Express application. Proposal-era contracts are excluded from active paths and retained separately in inventory metadata.
 
 ### Key Scope & Architecture:
 - **AI Skin Screening**: Image analysis, differential findings, confidence calibration, and emergency red-flag safeguards.
@@ -164,8 +165,7 @@ Welcome to the **DermaCare AI API Developer Documentation Portal**. DermaCare AI
 5. **Separation of Sponsored Content**: Advertisements must be labeled "Sponsored" and MUST NEVER appear on AI results, emergency alerts, consultations, prescriptions, or chats.
 
 ---
-> **Implementation Status Note:**
-> This portal reflects the **84 proposed REST API endpoints** from the official *DermaCare AI Optimized MVP API Specification*. As documented in the repository audit, all 84 endpoints are in **Specified (Contract Proposed)** status pending backend route implementation.
+> **Implementation Status:** ${ACTIVE_ENDPOINTS.length} mounted operations are documented. Proposal-era operations are not advertised as callable APIs.
       `.trim(),
       contact: {
         name: 'DermaCare AI Developer Team',
@@ -189,6 +189,7 @@ Welcome to the **DermaCare AI API Developer Documentation Portal**. DermaCare AI
     ],
     tags,
     paths,
+    'x-proposed-operations': ALL_ENDPOINTS.map(({ method, path, summary, moduleName }) => ({ method, path, summary, moduleName })),
     components: {
       securitySchemes: {
         BearerAuth: {
@@ -207,17 +208,12 @@ Welcome to the **DermaCare AI API Developer Documentation Portal**. DermaCare AI
       schemas: {
         ErrorResponse: {
           type: 'object',
-          required: ['success', 'error'],
+          required: ['statusCode', 'success', 'message', 'data'],
           properties: {
+            statusCode: { type: 'integer', example: 400 },
             success: { type: 'boolean', example: false },
-            error: {
-              type: 'object',
-              required: ['code', 'message'],
-              properties: {
-                code: { type: 'string', example: 'VALIDATION_ERROR' },
-                message: { type: 'string', example: 'Detailed error description' }
-              }
-            }
+            message: { type: 'string', example: 'The request is invalid.' },
+            data: { nullable: true, example: null }
           }
         },
         SuccessResponse: {

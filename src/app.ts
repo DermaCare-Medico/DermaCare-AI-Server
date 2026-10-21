@@ -18,6 +18,19 @@ app.use(httpLogger);
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+app.get(["/", "/health"], (_req, res) => {
+  res.status(200).json({
+    success: true,
+    statusCode: 200,
+    message: "Service is healthy",
+    data: {
+      status: "ok",
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
 // Actual backend routes
 app.use("/api/v1", apiRouter);
 

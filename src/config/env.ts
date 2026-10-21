@@ -1,4 +1,3 @@
-
 import "dotenv/config";
 import { z } from "zod";
 
@@ -16,6 +15,9 @@ const envSchema = z
     // Server
     PORT: z.coerce.number().int().min(1).max(65535).default(4000),
 
+    // Store
+    LOW_STOCK_THRESHOLD: z.coerce.number().int().nonnegative().default(10),
+
     // JWT
     JWT_ACCESS_SECRET: z.string().min(96),
     JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
@@ -25,6 +27,13 @@ const envSchema = z
 
     // Google authentication
     GOOGLE_CLIENT_ID: optionalString,
+
+    // Google Calendar / Meet (optional; failures remain retryable)
+    GOOGLE_CALENDAR_CLIENT_ID: optionalString,
+    GOOGLE_CALENDAR_CLIENT_SECRET: optionalString,
+    GOOGLE_CALENDAR_REDIRECT_URI: optionalString,
+    GOOGLE_CALENDAR_REFRESH_TOKEN: optionalString,
+    GOOGLE_CALENDAR_ID: z.string().default("primary"),
 
     // SMTP email configuration
     SMTP_HOST: optionalString,

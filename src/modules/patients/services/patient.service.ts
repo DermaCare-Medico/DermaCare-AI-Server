@@ -67,8 +67,6 @@ const getMyProfile = async (userId: string) => {
 
 //patient profile patch api
 
-
-
 export const updateMyProfile = async (
     userId: string,
     payload: UpdatePatientProfilePayload
