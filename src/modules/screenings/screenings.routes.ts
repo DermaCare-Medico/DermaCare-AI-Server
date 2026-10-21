@@ -4,6 +4,7 @@ import { Router } from "express";
 import { authenticate } from "../../middlewares/authenticate.middleware.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
 import { uploadScreeningImage } from "../../middlewares/upload.middleware.js";
+import { asyncHandler } from "../../middlewares/asyncHandler.js";
 
 import { uploadScreeningImageController } from "./controllers/screening-image.controller.js";
 import {
@@ -11,10 +12,8 @@ import {
   getScreeningHistoryItemController,
 } from "./controllers/screening-history.controller.js";
 import {
-  getScreeningDoctorRecommendationsController,
+  screeningDoctorRecommendationController,
 } from "./controllers/doctor-recommendation.controller.js";
-
-
 
 const router = Router();
 
@@ -24,24 +23,22 @@ router.use(authorize("PATIENT"));
 router.post(
   "/images",
   uploadScreeningImage,
-  uploadScreeningImageController,
+  asyncHandler(uploadScreeningImageController),
 );
 
 router.get(
   "/history",
-  getScreeningHistoryController,
+  asyncHandler(getScreeningHistoryController),
 );
 
 router.get(
   "/history/:screeningId",
-  getScreeningHistoryItemController,
+  asyncHandler(getScreeningHistoryItemController),
 );
 
 router.get(
   "/:screeningId/doctors",
-  authenticate,
-  authorize("PATIENT"),
-  getScreeningDoctorRecommendationsController,
+  asyncHandler(screeningDoctorRecommendationController),
 );
 
 export default router;

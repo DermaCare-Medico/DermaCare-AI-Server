@@ -1,68 +1,37 @@
+import { DoctorApprovalStatus } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
+import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 
-export async function getScreeningDoctorRecommendations(
-  screeningId: string,
+export async function recommendDoctorsForScreening(
   userId: string,
+  screeningId: string,
 ) {
+  const patient = await prisma.patientProfile.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+
+  if (!patient) {
+    throw new AppError("Patient profile not found", HTTP_STATUS.NOT_FOUND);
+  }
+
   const screening = await prisma.screening.findFirst({
     where: {
       id: screeningId,
-      patient: {
-        is: { userId },
-      },
+      patientId: patient.id,
     },
-    select: {
-      id: true,
-      aiStatus: true,
+    include: {
       predictions: {
         orderBy: { confidenceScore: "desc" },
         take: 1,
-        select: {
-          confidenceScore: true,
+        include: {
           condition: {
-            select: {
-              id: true,
-              name: true,
+            include: {
               specializations: {
-                select: {
+                include: {
                   specialization: {
-                    select: {
-                      id: true,
-                      name: true,
-                      doctors: {
-                        where: {
-                          doctor: {
-                            is: {
-                              approvalStatus: "APPROVED",
-                            },
-                          },
-                        },
-                        select: {
-                          doctor: {
-                            select: {
-                              id: true,
-                              qualifications: true,
-                              experienceYears: true,
-                              consultationFee: true,
-                              bio: true,
-                              rating: true,
-                              ratingCount: true,
-                              specializations: {
-                                select: {
-                                  specialization: {
-                                    select: {
-                                      id: true,
-                                      name: true,
-                                    },
-                                  },
-                                },
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
+                    select: { id: true, name: true },
                   },
                 },
               },
@@ -74,17 +43,7 @@ export async function getScreeningDoctorRecommendations(
   });
 
   if (!screening) {
-    throw new AppError(
-      "Screening not found or access denied",
-      404,
-    );
-  }
-
-  if (screening.aiStatus !== "COMPLETED") {
-    throw new AppError(
-      "Screening prediction is not completed",
-      409,
-    );
+    throw new AppError("Screening not found", HTTP_STATUS.NOT_FOUND);
   }
 
   const prediction = screening.predictions[0];
@@ -93,91 +52,114 @@ export async function getScreeningDoctorRecommendations(
     return {
       screeningId,
       condition: null,
-      confidenceScore: null,
-      specializations: [],
-      doctors: [],
-      message: "No prediction is available.",
+      recommendations: [],
+      message: "No prediction is available for this screening yet.",
     };
   }
 
-  const condition = prediction.condition;
+  const conditionName = prediction.condition.name;
+  const normalizedName = conditionName.trim().toLowerCase();
 
-  // Do not recommend doctors for the model's normal/unknown label.
-  if (condition.name === "Unknown Normal") {
+  // A normal result should not trigger a specialist recommendation.
+  if (normalizedName === "normal" || normalizedName === "unknown normal") {
     return {
       screeningId,
-      condition: condition.name,
-      confidenceScore: Number(prediction.confidenceScore),
-      specializations: [],
-      doctors: [],
-      message:
-        "No specific doctor recommendation is generated for this result.",
-      disclaimer:
-        "AI screening is not a medical diagnosis. Seek medical advice if you have persistent or concerning symptoms.",
+      condition: {
+        id: prediction.conditionId,
+        name: conditionName,
+        confidenceScore: prediction.confidenceScore,
+      },
+      recommendations: [],
+      message: "No specific specialist recommendation is available.",
     };
   }
 
-  const specializations = condition.specializations.map(
+  const specializations = prediction.condition.specializations.map(
     (item) => item.specialization,
   );
 
-  const doctorMap = new Map<
-    string,
-    {
-      id: string;
-      qualifications: string[];
-      experienceYears: number;
-      consultationFee: unknown;
-      bio: string | null;
-      rating: unknown;
-      ratingCount: number;
-      specializations: { id: string; name: string }[];
-    }
-  >();
+  const specializationIds = specializations.map((item) => item.id);
 
-  for (const specialization of specializations) {
-    for (const entry of specialization.doctors) {
-      const doctor = entry.doctor;
-
-      const existing = doctorMap.get(doctor.id);
-
-      if (existing) continue;
-
-      doctorMap.set(doctor.id, {
-        id: doctor.id,
-        qualifications: doctor.qualifications,
-        experienceYears: doctor.experienceYears,
-        consultationFee: doctor.consultationFee.toString(),
-        bio: doctor.bio,
-        rating: doctor.rating?.toString() ?? null,
-        ratingCount: doctor.ratingCount,
-        specializations: doctor.specializations.map(
-          (item) => item.specialization,
-        ),
-      });
-    }
+  if (specializationIds.length === 0) {
+    return {
+      screeningId,
+      condition: {
+        id: prediction.conditionId,
+        name: conditionName,
+        confidenceScore: prediction.confidenceScore,
+      },
+      recommendations: [],
+      message: "No matching specialization is configured for this condition.",
+    };
   }
 
-  const doctors = [...doctorMap.values()].sort(
-    (a, b) =>
-      b.experienceYears - a.experienceYears ||
-      (Number(b.rating ?? 0) - Number(a.rating ?? 0)),
-  );
+  const doctors = await prisma.doctorProfile.findMany({
+    where: {
+      approvalStatus: DoctorApprovalStatus.APPROVED,
+      user: {
+        role: "DOCTOR",
+        status: "ACTIVE",
+        deletedAt: null,
+      },
+      specializations: {
+        some: {
+          specializationId: { in: specializationIds },
+        },
+      },
+    },
+    select: {
+      id: true,
+      qualifications: true,
+      experienceYears: true,
+      consultationFee: true,
+      bio: true,
+      rating: true,
+      ratingCount: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      specializations: {
+        where: {
+          specializationId: { in: specializationIds },
+        },
+        select: {
+          specialization: {
+            select: { id: true, name: true },
+          },
+        },
+      },
+    },
+    orderBy: [
+      { experienceYears: "desc" },
+      { rating: "desc" },
+    ],
+  });
 
   return {
     screeningId,
-    condition: condition.name,
-    confidenceScore: Number(prediction.confidenceScore),
-    specializations: specializations.map(({ id, name }) => ({
-      id,
-      name,
+    condition: {
+      id: prediction.conditionId,
+      name: conditionName,
+      confidenceScore: prediction.confidenceScore,
+    },
+    matchedSpecializations: specializations,
+    recommendations: doctors.map((doctor) => ({
+      doctorId: doctor.id,
+      name: doctor.user.name,
+      qualifications: doctor.qualifications,
+      experienceYears: doctor.experienceYears,
+      consultationFee: doctor.consultationFee,
+      rating: doctor.rating,
+      ratingCount: doctor.ratingCount,
+      bio: doctor.bio,
+      specializations: doctor.specializations.map(
+        (item) => item.specialization,
+      ),
     })),
-    doctors,
-    message:
-      doctors.length > 0
-        ? "Matching approved doctors found."
-        : "No approved doctors are currently available for this condition.",
     disclaimer:
-      "AI screening is not a medical diagnosis. Recommendations are based on configured specialization mappings. Consult a qualified clinician for medical assessment.",
+      "AI screening is not a medical diagnosis. Consult a qualified doctor for clinical assessment.",
   };
 }
