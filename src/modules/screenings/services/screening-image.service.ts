@@ -62,15 +62,5 @@ export async function saveScreeningImage(
     }
 
     throw error;
-  } finally {
-    try {
-      await unlink(filePath);
-    } catch (error) {
-      if (
-        (error as NodeJS.ErrnoException).code !== "ENOENT"
-      ) {
-        console.error("Temporary file cleanup failed:", error);
-      }
-    }
-  }
+  } 
 }
