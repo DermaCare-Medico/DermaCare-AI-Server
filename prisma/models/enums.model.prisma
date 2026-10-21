@@ -2,6 +2,7 @@ enum Role {
   PATIENT
   DOCTOR
   ADMIN
+  USER
   STORE_OWNER
 
   @@map("user_role")
