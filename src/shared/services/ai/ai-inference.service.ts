@@ -15,6 +15,13 @@ interface ModelResources {
   preprocessorConfig: PreprocessorConfig;
 }
 
+export class UnusableScreeningImageError extends Error {
+  constructor(message = "Screening image could not be processed") {
+    super(message);
+    this.name = "UnusableScreeningImageError";
+  }
+}
+
 const MODEL_DIR = path.resolve(
   process.cwd(),
   "model",
@@ -122,16 +129,22 @@ async function preprocessImage(
 ): Promise<ort.Tensor> {
   const { width, height } = config.size;
 
-  const { data, info } = await sharp(imagePath)
-    .rotate()
-    .resize(width, height, {
-      fit: "fill",
-      kernel: sharp.kernel.linear,
-    })
-    .removeAlpha()
-    .toColourspace("srgb")
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+  let data: Buffer;
+  let info: { width: number; height: number; channels: number };
+  try {
+    ({ data, info } = await sharp(imagePath)
+      .rotate()
+      .resize(width, height, {
+        fit: "fill",
+        kernel: sharp.kernel.linear,
+      })
+      .removeAlpha()
+      .toColourspace("srgb")
+      .raw()
+      .toBuffer({ resolveWithObject: true }));
+  } catch {
+    throw new UnusableScreeningImageError();
+  }
 
   if (
     info.width !== width ||

@@ -26,6 +26,7 @@ test("Screening router mounts creation before image, history, and recommendation
     "POST /images",
     "GET /history",
     "GET /history/:screeningId",
+    "POST /:screeningId/retry",
     "GET /:screeningId/doctors",
   ]);
 });

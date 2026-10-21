@@ -9,3 +9,7 @@ export const screeningImageSchema = z.object({
   screeningId: z.string().uuid(),
   imageType: z.enum(["FRONT", "LEFT", "RIGHT", "OTHER"]),
 });
+
+export const screeningIdParamsSchema = z.object({
+  screeningId: z.string().uuid(),
+});

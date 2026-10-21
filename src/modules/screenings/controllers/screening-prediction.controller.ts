@@ -1,7 +1,8 @@
 
 import type { Request, Response } from "express";
 import { AppError } from "../../../shared/errors/AppError.js";
-import { processScreeningPrediction } from "../services/screening-prediction.service.js";
+import { retryFailedScreening } from "../services/screening-prediction.service.js";
+import { screeningIdParamsSchema } from "../screenings.validation.js";
 
 export async function processScreeningPredictionController(
   req: Request,
@@ -11,14 +12,11 @@ export async function processScreeningPredictionController(
     throw new AppError("Authentication required", 401);
   }
 
-  const screeningId = req.params.screeningId;
-
-  if (typeof screeningId !== "string") {
-    throw new AppError("Invalid screening ID", 400);
-  }
-
-  throw new AppError(
-    "Use the image upload endpoint to process a screening.",
-    400,
-  );
+  const { screeningId } = screeningIdParamsSchema.parse(req.params);
+  const data = await retryFailedScreening(req.auth.userId, screeningId);
+  res.status(200).json({
+    success: true,
+    message: "Screening inference retry completed",
+    data,
+  });
 }

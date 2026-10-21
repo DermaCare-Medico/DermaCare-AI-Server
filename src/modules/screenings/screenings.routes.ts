@@ -15,6 +15,7 @@ import {
 import {
   screeningDoctorRecommendationController,
 } from "./controllers/doctor-recommendation.controller.js";
+import { processScreeningPredictionController } from "./controllers/screening-prediction.controller.js";
 
 const router = Router();
 
@@ -40,6 +41,11 @@ router.get(
 router.get(
   "/history/:screeningId",
   asyncHandler(getScreeningHistoryItemController),
+);
+
+router.post(
+  "/:screeningId/retry",
+  asyncHandler(processScreeningPredictionController),
 );
 
 router.get(
