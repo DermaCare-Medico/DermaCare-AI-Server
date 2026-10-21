@@ -36,3 +36,20 @@ export async function uploadPrivateImage(
 
   return result;
 }
+
+
+export async function deletePrivateImage(
+  publicId: string,
+): Promise<void> {
+  const result = await cloudinary.uploader.destroy(publicId, {
+    resource_type: "image",
+    type: "authenticated",
+    invalidate: true,
+  });
+
+  if (result.result !== "ok" && result.result !== "not found") {
+    throw new Error(
+      `Failed to delete Cloudinary image: ${result.result}`,
+    );
+  }
+}
