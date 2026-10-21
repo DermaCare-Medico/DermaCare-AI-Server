@@ -7,6 +7,8 @@ import { errorHandler } from "./shared/errors/errorHandler.js";
 import { notFound } from "./shared/errors/notFound.js";
 import apiRouter from "./routes/index.js";
 import docsRouter from "./docs/docs.routes.js";
+import { asyncHandler } from "./middlewares/asyncHandler.js";
+import { paymentWebhookController } from "./modules/payments/controllers/payment-webhook.controller.js";
 
 const app = express();
 
@@ -15,6 +17,11 @@ app.set("trust proxy", env.TRUST_PROXY);
 
 app.use(security);
 app.use(httpLogger);
+app.post(
+  "/api/v1/payments/stripe/webhook",
+  express.raw({ type: "application/json", limit: "1mb" }),
+  asyncHandler(paymentWebhookController.handleStripeWebhook),
+);
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 

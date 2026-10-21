@@ -35,6 +35,11 @@ const envSchema = z
     GOOGLE_CALENDAR_REFRESH_TOKEN: optionalString,
     GOOGLE_CALENDAR_ID: z.string().default("primary"),
 
+    // Stripe Checkout (optional; checkout endpoints report unavailable when omitted)
+    STRIPE_SECRET_KEY: optionalString,
+    STRIPE_WEBHOOK_SECRET: optionalString,
+    CLIENT_URL: z.string().url().default("http://localhost:3000"),
+
     // SMTP email configuration
     SMTP_HOST: optionalString,
     SMTP_PORT: z.coerce.number().int().positive().default(587),
