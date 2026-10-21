@@ -7,6 +7,7 @@ import { uploadScreeningImage } from "../../middlewares/upload.middleware.js";
 import { asyncHandler } from "../../middlewares/asyncHandler.js";
 
 import { uploadScreeningImageController } from "./controllers/screening-image.controller.js";
+import { createScreeningController } from "./controllers/screening-questionnaire.controller.js";
 import {
   getScreeningHistoryController,
   getScreeningHistoryItemController,
@@ -19,6 +20,11 @@ const router = Router();
 
 router.use(authenticate);
 router.use(authorize("PATIENT"));
+
+router.post(
+  "/",
+  asyncHandler(createScreeningController),
+);
 
 router.post(
   "/images",

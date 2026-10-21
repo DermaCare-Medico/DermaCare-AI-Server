@@ -4,7 +4,7 @@ import { AppError } from "../../../shared/errors/AppError.js";
 
 export async function createScreening(
   userId: string,
-  symptoms?: string,
+  symptoms: string,
 ) {
   const patient = await prisma.patientProfile.findUnique({
     where: { userId },
@@ -18,7 +18,7 @@ export async function createScreening(
   return prisma.screening.create({
     data: {
       patientId: patient.id,
-      symptoms: symptoms?.trim() || null,
+      symptoms: symptoms.trim(),
       aiStatus: "PENDING",
       disclaimer:
         "AI screening is not a medical diagnosis. Consult a qualified doctor.",

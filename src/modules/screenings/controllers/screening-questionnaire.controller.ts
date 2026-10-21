@@ -1,12 +1,8 @@
 
 import type { Request, Response } from "express";
-import { z } from "zod";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { createScreening } from "../services/screening-questionnaire.service.js";
-
-const createScreeningSchema = z.object({
-  symptoms: z.string().trim().max(5000).optional(),
-});
+import { createScreeningSchema } from "../screenings.validation.js";
 
 export async function createScreeningController(
   req: Request,
