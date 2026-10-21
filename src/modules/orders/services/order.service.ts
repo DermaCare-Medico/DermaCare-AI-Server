@@ -3,6 +3,7 @@ import {
     OrderStatus,
     Prisma,
     Role,
+    NotificationType,
 } from "../../../generated/prisma/client.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { prisma } from "../../../lib/prisma.js";
@@ -20,6 +21,7 @@ import {
     getOrderPaymentExpiry,
 } from "./order-payment.rules.js";
 import { getAllowedOrderTransitions } from "./order-status.rules.js";
+import { createNotification } from "../../notifications/services/notification.service.js";
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -133,7 +135,7 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
             );
             const paymentExpiresAt = getOrderPaymentExpiry();
 
-            return tx.order.create({
+            const order = await tx.order.create({
                 data: {
                     patientId: patient.id,
                     prescriptionId: input.prescriptionId,
@@ -162,6 +164,27 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                     },
                 },
             });
+
+            const admins = await tx.user.findMany({
+                where: {
+                    role: Role.ADMIN,
+                    status: AccountStatus.ACTIVE,
+                    deletedAt: null,
+                },
+                select: { id: true },
+            });
+            for (const admin of admins) {
+                await createNotification({
+                    userId: admin.id,
+                    title: "New medicine order",
+                    message: "A new medicine order has been placed and is awaiting payment.",
+                    notificationType: NotificationType.ORDER,
+                    relatedEntityType: "Order",
+                    relatedEntityId: order.id,
+                }, tx);
+            }
+
+            return order;
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {

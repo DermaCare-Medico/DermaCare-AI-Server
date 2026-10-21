@@ -10,6 +10,7 @@ import {
     TransactionPurpose,
     TransactionStatus,
     MeetingProvisioningStatus,
+    NotificationType,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
@@ -20,6 +21,7 @@ import {
     isOrderPaymentExpired,
 } from "../../orders/services/order-payment.rules.js";
 import { requestMeetingProvisioning } from "../../../integrations/google-calendar/meeting-provisioning.worker.js";
+import { createNotification } from "../../notifications/services/notification.service.js";
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -64,6 +66,7 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
                     status: true,
                     doctor: {
                         select: {
+                            userId: true,
                             approvalStatus: true,
                             consultationFee: true,
                         },
@@ -151,6 +154,23 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
                     createdAt: true,
                 },
             });
+
+            await createNotification({
+                userId,
+                title: "Appointment payment successful",
+                message: "Your appointment payment was successful and the appointment is confirmed.",
+                notificationType: NotificationType.PAYMENT,
+                relatedEntityType: "Appointment",
+                relatedEntityId: appointment.id,
+            }, tx);
+            await createNotification({
+                userId: appointment.doctor.userId,
+                title: "Appointment confirmed",
+                message: "An appointment has been confirmed after successful payment.",
+                notificationType: NotificationType.APPOINTMENT,
+                relatedEntityType: "Appointment",
+                relatedEntityId: appointment.id,
+            }, tx);
 
             return {
                 ...payment,
@@ -300,6 +320,14 @@ const payForOrder = async (
                     createdAt: true,
                 },
             });
+            await createNotification({
+                userId,
+                title: "Order payment successful",
+                message: "Your medicine order payment was successful and the order is confirmed.",
+                notificationType: NotificationType.PAYMENT,
+                relatedEntityType: "Order",
+                relatedEntityId: order.id,
+            }, tx);
             return { ...payment, orderStatus: OrderStatus.CONFIRMED };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
