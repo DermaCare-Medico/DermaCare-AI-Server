@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 import { notificationController } from "./controllers/notification.controller.js";
 import {
     validateNotificationId,

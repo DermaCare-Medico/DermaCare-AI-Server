@@ -1,4 +1,4 @@
-import { asyncHandler } from "../../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../../middlewares/asyncHandler.middleware.js";
 import { passwordResetService } from "../services/password-reset.service.js";
 import {
   emailOnlySchema,
