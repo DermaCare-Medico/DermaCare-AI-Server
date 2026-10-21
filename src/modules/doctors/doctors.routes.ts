@@ -8,6 +8,7 @@ import { doctorController } from "./doctor.controller.js";
 
 import {
   createSlotController,
+  getAvailableSlotsController,
   getMySlotsController,
   updateSlotController,
 } from "./controllers/doctor-slot.controller.js";
@@ -27,6 +28,10 @@ const router = Router();
 
 // Public: approved doctors only
 router.get("/", doctorController.list);
+router.get(
+  "/:doctorId/slots",
+  asyncHandler(getAvailableSlotsController),
+);
 router.get("/:doctorId", doctorController.getById);
 
 // Authenticated user: apply and view own application

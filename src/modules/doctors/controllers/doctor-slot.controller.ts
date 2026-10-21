@@ -1,11 +1,13 @@
 import type { Request, Response } from "express";
 import {
   createDoctorSlot,
+  getAvailableDoctorSlots,
   getMyDoctorSlots,
   updateDoctorSlot,
 } from "../services/doctor-slot.service.js";
 import {
   createDoctorSlotSchema,
+  doctorIdParamsSchema,
   doctorSlotParamsSchema,
   updateDoctorSlotSchema,
 } from "../doctors.validation.js";
@@ -20,6 +22,15 @@ function getUserId(req: Request) {
   }
 
   return userId;
+}
+
+export async function getAvailableSlotsController(
+  req: Request,
+  res: Response,
+) {
+  const { doctorId } = doctorIdParamsSchema.parse(req.params);
+  const slots = await getAvailableDoctorSlots(doctorId);
+  res.status(HTTP_STATUS.OK).json({ success: true, data: slots });
 }
 
 export async function createSlotController(

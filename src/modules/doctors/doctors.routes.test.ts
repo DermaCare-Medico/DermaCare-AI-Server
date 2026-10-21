@@ -39,6 +39,7 @@ test("Doctor router exposes only canonical public and role-specific routes", () 
 
   assert.deepEqual(routes, [
     { method: "GET", path: "/" },
+    { method: "GET", path: "/:doctorId/slots" },
     { method: "GET", path: "/:doctorId" },
     { method: "POST", path: "/application" },
     { method: "GET", path: "/me/profile" },
