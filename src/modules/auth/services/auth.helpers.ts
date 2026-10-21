@@ -85,7 +85,7 @@ export const startSession = async (user: DbUser, meta: RequestMeta) => {
   return { user: publicUser(user), doctorStatus, ...tokens };
 };
 
-export const createAccount = async (input: {
+type CreateAccountInput = {
   name: string;
   email: string;
   role: RegisterRole;
@@ -94,78 +94,85 @@ export const createAccount = async (input: {
     | { provider: "PASSWORD"; passwordHash: string }
     | { provider: "GOOGLE"; sub: string };
   notifyAdminsOfDoctorRegistration?: boolean;
-}): Promise<DbUser> => {
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const now = new Date();
+};
 
-      const user = await tx.user.create({
-        data: {
-          name: input.name,
-          email: input.email,
-          role: input.role,
-          emailVerified: true,
-          termsAcceptedAt: now,
-          privacyAcceptedAt: now,
-          healthConsentAcceptedAt: now,
-          consentVersion: input.consentVersion,
-        },
-        select: userSelect,
-      });
+const createAccountWithClient = async (
+  input: CreateAccountInput,
+  tx: Prisma.TransactionClient,
+): Promise<DbUser> => {
+  const now = new Date();
 
-      await tx.authIdentity.create({
-        data:
-          input.identity.provider === "PASSWORD"
-            ? {
-                userId: user.id,
-                provider: "PASSWORD",
-                providerId: user.id,
-                passwordHash: input.identity.passwordHash,
-              }
-            : {
-                userId: user.id,
-                provider: "GOOGLE",
-                providerId: input.identity.sub,
-              },
-      });
+  const user = await tx.user.create({
+    data: {
+      name: input.name,
+      email: input.email,
+      role: input.role,
+      emailVerified: true,
+      termsAcceptedAt: now,
+      privacyAcceptedAt: now,
+      healthConsentAcceptedAt: now,
+      consentVersion: input.consentVersion,
+    },
+    select: userSelect,
+  });
 
-      // A Patient is active immediately; a Doctor adds license details later
-      if (input.role === Role.PATIENT) {
-        await tx.patientProfile.create({
-          data: { userId: user.id },
-        });
-      }
-
-      if (
-        input.role === Role.DOCTOR &&
-        input.notifyAdminsOfDoctorRegistration
-      ) {
-        const admins = await tx.user.findMany({
-          where: {
-            role: Role.ADMIN,
-            status: AccountStatus.ACTIVE,
-            deletedAt: null,
+  await tx.authIdentity.create({
+    data:
+      input.identity.provider === "PASSWORD"
+        ? {
+            userId: user.id,
+            provider: "PASSWORD",
+            providerId: user.id,
+            passwordHash: input.identity.passwordHash,
+          }
+        : {
+            userId: user.id,
+            provider: "GOOGLE",
+            providerId: input.identity.sub,
           },
-          select: { id: true },
-        });
+  });
 
-        for (const admin of admins) {
-          await createNotification(
-            {
-              userId: admin.id,
-              title: "New doctor registration",
-              message: "A new doctor account has completed registration.",
-              notificationType: NotificationType.ACCOUNT,
-              relatedEntityType: "User",
-              relatedEntityId: user.id,
-            },
-            tx,
-          );
-        }
-      }
+  // A Patient is active immediately; a Doctor adds license details later
+  if (input.role === Role.PATIENT) {
+    await tx.patientProfile.create({ data: { userId: user.id } });
+  }
 
-      return user;
+  if (input.role === Role.DOCTOR && input.notifyAdminsOfDoctorRegistration) {
+    const admins = await tx.user.findMany({
+      where: {
+        role: Role.ADMIN,
+        status: AccountStatus.ACTIVE,
+        deletedAt: null,
+      },
+      select: { id: true },
     });
+
+    for (const admin of admins) {
+      await createNotification(
+        {
+          userId: admin.id,
+          title: "New doctor registration",
+          message: "A new doctor account has completed registration.",
+          notificationType: NotificationType.ACCOUNT,
+          relatedEntityType: "User",
+          relatedEntityId: user.id,
+        },
+        tx,
+      );
+    }
+  }
+
+  return user;
+};
+
+export const createAccount = async (
+  input: CreateAccountInput,
+  transactionClient?: Prisma.TransactionClient,
+): Promise<DbUser> => {
+  try {
+    return transactionClient
+      ? await createAccountWithClient(input, transactionClient)
+      : await prisma.$transaction((tx) => createAccountWithClient(input, tx));
   } catch (e) {
     if (isUniqueViolation(e)) {
       throw new AppError("An account with this email already exists", 409);

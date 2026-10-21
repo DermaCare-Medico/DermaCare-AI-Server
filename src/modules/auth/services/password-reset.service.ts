@@ -3,7 +3,6 @@ import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { hashPassword } from "./password.service.js";
 import { otpService } from "./otp.service.js";
-import { revokeAllSessions } from "./token.service.js";
 import { sendCode, otpInfo } from "./auth.helpers.js";
 
 export const passwordResetService = {
@@ -59,38 +58,43 @@ async requestPasswordResetOtp(email: string) {
     otp: string;
     newPassword: string;
   }) {
-    await otpService.verify({
-      email: input.email,
-      purpose: "PASSWORD_RESET",
-      code: input.otp,
-      consume: true,
-    });
-
-    const user = await prisma.user.findUnique({
-      where: { email: input.email },
-      select: { id: true, deletedAt: true },
-    });
-
-    if (!user || user.deletedAt) {
-      throw new AppError("Invalid or expired code", 400);
-    }
-
     const passwordHash = await hashPassword(input.newPassword);
 
-    // a Google-only user gets a password sign-in method here (email is already verified)
-    await prisma.authIdentity.upsert({
-      where: {
-        userId_provider: { userId: user.id, provider: "PASSWORD" },
-      },
-      create: {
-        userId: user.id,
-        provider: "PASSWORD",
-        providerId: user.id,
-        passwordHash,
-      },
-      update: { passwordHash },
-    });
+    await prisma.$transaction(async (tx) => {
+      await otpService.verify({
+        email: input.email,
+        purpose: "PASSWORD_RESET",
+        code: input.otp,
+        consume: true,
+      }, tx);
 
-    await revokeAllSessions(user.id); // sign out everywhere
+      const user = await tx.user.findUnique({
+        where: { email: input.email },
+        select: { id: true, deletedAt: true },
+      });
+
+      if (!user || user.deletedAt) {
+        throw new AppError("Invalid or expired code", 400);
+      }
+
+      // a Google-only user gets a password sign-in method here (email is already verified)
+      await tx.authIdentity.upsert({
+        where: {
+          userId_provider: { userId: user.id, provider: "PASSWORD" },
+        },
+        create: {
+          userId: user.id,
+          provider: "PASSWORD",
+          providerId: user.id,
+          passwordHash,
+        },
+        update: { passwordHash },
+      });
+
+      await tx.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
   },
 };
