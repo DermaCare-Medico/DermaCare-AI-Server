@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Role } from "../../generated/prisma/client.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
-import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 import { prescriptionController } from "./prescriptions.controller.js";
 
 const router = Router();

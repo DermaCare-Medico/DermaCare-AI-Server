@@ -304,3 +304,34 @@ Static checks: both Postman JSON files parse successfully. TypeScript `tsc --noE
 4. Split role login/setup into Patient, Doctor-applicant, approved Doctor, and Admin workflows; dynamically capture every dependent ID and explain approval prerequisites.
 5. Mark OTP/Google values as placeholders, remove fake Stripe signature automation, and add the Stripe CLI workflow.
 6. Optionally add a Diagnostics/Docs folder for the six mounted utility endpoints, kept separate from business workflows.
+
+## J. Remediation summary (2026-10-22)
+
+The collection and environment were remediated after this audit. Earlier findings in sections A–I describe the pre-remediation state; this section is the current documentation status.
+
+| Result | Count / status |
+|---|---:|
+| Total collection requests | 130 |
+| Existing requests corrected and preserved | 124 |
+| Mounted Diagnostics/Docs requests added | 6 |
+| Saved response examples added/replaced | 131 |
+| Endpoint-specific test scripts added/replaced | 130 |
+| Generic `[200,201,204]` assertions remaining | 0 |
+| Binary downloads incorrectly asserted as JSON | 0 |
+| Requests without a saved response example | 0 |
+| Unresolved method/path mismatches | 0 |
+
+Completed corrections:
+
+- Cancellation decisions now use `reviewNotes`; conversation creation uses `content`; message pagination uses `limit` with documented optional cursor; unsupported prescription status and all invalid empty filters were removed.
+- Screening recommendations now use `patientToken`. Binary Doctor documents test status/content headers without JSON parsing. Multipart uploads retain the correct `image` field, JPEG/PNG constraint, and 10 MB guidance.
+- Every request now tests its implemented success status (with the payout-generation 200 idempotent/201 created exception). The manual webhook documentation no longer claims a fake Postman signature is successful.
+- Login/verification scripts conditionally store the token matching the returned role. Creation/list requests conditionally capture dependent IDs without assuming data exists.
+- Placeholder UUIDs and document keys were cleared. Fake `stripeSignature` was removed; OTP and password fields are secret variables, and real emailed OTP/SMTP/expiry/resend requirements are documented.
+- Collection-level workflow guidance now distinguishes Checkout creation from signed-webhook confirmation, disables assumptions about demo payments, and identifies Doctor payouts as demo settlements rather than bank transfers.
+
+Environment issues resolved: 16 misleading resource/document defaults cleared; five workflow variables added (`loginEmail`, `loginPassword`, `registrationOtp`, `passwordResetOtp`, `messageCursor`) plus payment/checkout/document-index variables; all credential/token values remain empty and secret-typed where appropriate.
+
+Validation results: collection JSON and environment JSON parse successfully; 130/130 requests have response examples and tests (131 examples total, including invalid and verified webhook outcomes); 124 operational request method/path pairs still match mounted routes and the six mounted utility/documentation routes are now included. Static scans found no old broad success assertion, binary JSON assertion, fake signature variable, `123456` OTP, or known invalid empty query example.
+
+Remaining limitations: no live API/database or external service was called. Stripe, SMTP/Gmail, Cloudinary, Google Meet, AI inference, and Neon/Prisma remain externally unverified. The earlier email-service conflict has since been resolved outside this documentation remediation. Backend typecheck is currently blocked by three imports of nonexistent `middlewares/asyncHandler.js` (`src/app.ts`, Conversations routes, Prescriptions routes; the real file is `asyncHandler.middleware.ts`) and the missing `@upstash/redis` dependency used by `src/shared/redis/redis.client.ts`. Backend source was intentionally not altered.
