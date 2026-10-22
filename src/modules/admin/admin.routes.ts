@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 import { dashboardController } from "./controllers/dashboard.controller.js";
 import { adminController } from "./controllers/admin.controller.js";
 import { doctorPayoutAdminController } from "./controllers/doctor-payout-admin.controller.js";

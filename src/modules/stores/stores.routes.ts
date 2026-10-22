@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 import { medicineController } from "./controllers/medicine.controller.js";
 import {
     validatePublicMedicineId,

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { Role } from "../../generated/prisma/client.js";
 import { authenticate } from "../../middlewares/authenticate.middleware.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
-import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 import { uploadScreeningImage } from "../../middlewares/upload.middleware.js";
 import { doctorController } from "./doctor.controller.js";
 

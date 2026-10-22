@@ -1,4 +1,4 @@
-import { asyncHandler } from "../../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../../middlewares/asyncHandler.middleware.js";
 import { loginService } from "../services/login.service.js";
 import { metaOf } from "./controller.helpers.js";
 import { googleAuthSchema, loginSchema, parse } from "../auth.validation.js";

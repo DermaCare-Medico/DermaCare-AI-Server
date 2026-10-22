@@ -1,4 +1,4 @@
-import { asyncHandler } from "../../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../../middlewares/asyncHandler.middleware.js";
 import { sessionService } from "../services/session.service.js";
 import { metaOf } from "./controller.helpers.js";
 import { parse, refreshSchema } from "../auth.validation.js";

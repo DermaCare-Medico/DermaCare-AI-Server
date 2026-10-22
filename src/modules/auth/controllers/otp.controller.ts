@@ -1,4 +1,4 @@
-import { asyncHandler } from "../../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../../middlewares/asyncHandler.middleware.js";
 import { registrationService } from "../services/registration.service.js";
 import { metaOf } from "./controller.helpers.js";
 import {

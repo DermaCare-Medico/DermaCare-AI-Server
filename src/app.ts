@@ -1,7 +1,7 @@
 
 import express from "express";
 import { env } from "./config/env.js";
-import { security } from "./middlewares/security.js";
+import { security } from "./middlewares/security.middleware.js";
 import { httpLogger } from "./shared/logger/httpLogger.js";
 import { errorHandler } from "./shared/errors/errorHandler.js";
 import { notFound } from "./shared/errors/notFound.js";

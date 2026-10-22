@@ -26,7 +26,7 @@ export const AUTH_RATE_LIMITS = {
   // Failed logins only (per IP + email)
   LOGIN_FAILED: {
     WINDOW_MS: 15 * 60 * 1000,
-    MAX_REQUESTS: 10,
+    MAX_REQUESTS: 5,
   },
 } as const;
 

@@ -53,8 +53,10 @@ export const sendOtpEmail = async (
   to: string,
   code: string,
   purpose: keyof typeof SUBJECTS,
+  userName?: string | null,
 ): Promise<void> => {
   if (!transporter) {
+<<<<<<< HEAD
     if (env.NODE_ENV === "production") {
       throw new AppError("Email delivery service is currently unavailable", 503);
     }
@@ -63,9 +65,16 @@ export const sendOtpEmail = async (
     // Never log the OTP code or full recipient in production/staging.
     console.info(`[email:dev] Mock email dispatch for ${purpose} to masked recipient`);
     return;
+=======
+    throw new AppError("Email service is not configured", 500);
+>>>>>>> 82ec859397c855eeec47d1624c70e729bdecfb6d
   }
 
   const minutes = AUTH_OTP.TTL_MS / 60_000;
+
+  // Prefer the user's real name; otherwise use the email username.
+  const displayName =
+    userName?.trim() || to.split("@")[0]?.trim() || "there";
 
   try {
     const info = await transporter.sendMail({
@@ -77,6 +86,7 @@ export const sendOtpEmail = async (
         code,
         purpose,
         expiresInMinutes: minutes,
+        userName: displayName,
       }),
     });
 
@@ -84,13 +94,8 @@ export const sendOtpEmail = async (
       throw new AppError("Email could not be delivered", 502);
     }
 
-    // Log delivery metadata only; never log the OTP or recipient.
-    console.info("[Email] Message accepted", {
-      purpose,
-      provider: env.EMAIL_GOOGLE_USER ? "GMAIL_OAUTH2" : "SMTP",
-      acceptedCount: info.accepted.length,
-      rejectedCount: info.rejected.length,
-    });
+    // Log delivery metadata only. Never log OTPs or recipients.
+    // OTP-related console output has intentionally been removed.
   } catch (error: unknown) {
     const mailError =
       error instanceof Error ? (error as MailError) : undefined;

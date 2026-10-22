@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 import { paymentController } from "./controllers/payment.controller.js";
 import { paymentVerificationController } from "./controllers/payment-verification.controller.js";
 import {

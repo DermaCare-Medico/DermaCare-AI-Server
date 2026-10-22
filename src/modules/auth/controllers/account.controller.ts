@@ -1,4 +1,4 @@
-import { asyncHandler } from "../../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../../middlewares/asyncHandler.middleware.js";
 import { accountService } from "../services/account.service.js";
 import { userIdOf } from "./controller.helpers.js";
 import {

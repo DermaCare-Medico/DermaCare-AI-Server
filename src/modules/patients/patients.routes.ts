@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 import { medicationController } from "./controllers/medication.controller.js";
 import { patientController } from "./controllers/patient.controller.js";
 import {
