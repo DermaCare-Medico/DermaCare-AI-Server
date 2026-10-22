@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   AccountStatus,
   DoctorApprovalStatus,
+  Role,
 } from "../../../generated/prisma/client.js";
 import {
   assertDoctorAccountEligibleForApproval,
@@ -25,6 +26,21 @@ test("Doctor approval permits only an unreviewed request", () => {
 test("Doctor approval rejects suspended, rejected, and deleted accounts", () => {
   assert.doesNotThrow(() =>
     assertDoctorAccountEligibleForApproval({ status: AccountStatus.ACTIVE, deletedAt: null }),
+  );
+  assert.doesNotThrow(() =>
+    assertDoctorAccountEligibleForApproval({
+      status: AccountStatus.ACTIVE,
+      deletedAt: null,
+      role: Role.USER,
+    }),
+  );
+  assert.throws(
+    () => assertDoctorAccountEligibleForApproval({
+      status: AccountStatus.ACTIVE,
+      deletedAt: null,
+      role: Role.ADMIN,
+    }),
+    (error: { statusCode?: number }) => error.statusCode === 400,
   );
   assert.doesNotThrow(() =>
     assertDoctorAccountEligibleForApproval({ status: AccountStatus.PENDING, deletedAt: null }),

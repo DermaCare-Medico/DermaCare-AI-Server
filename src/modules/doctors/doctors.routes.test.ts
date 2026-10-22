@@ -43,11 +43,13 @@ test("Doctor router exposes only canonical public and role-specific routes", () 
     { method: "GET", path: "/:doctorId" },
     { method: "POST", path: "/application" },
     { method: "GET", path: "/me/profile" },
+    { method: "PATCH", path: "/me/profile" },
     { method: "POST", path: "/me/slots" },
     { method: "GET", path: "/me/slots" },
     { method: "PATCH", path: "/me/slots/:slotId" },
     { method: "DELETE", path: "/me/slots/:slotId" },
     { method: "GET", path: "/me/appointment-requests" },
+    { method: "GET", path: "/me/appointments" },
     { method: "PATCH", path: "/me/appointments/:appointmentId/decision" },
     { method: "PATCH", path: "/me/appointments/:appointmentId/complete" },
     { method: "POST", path: "/me/medicine-requests" },
@@ -57,15 +59,16 @@ test("Doctor router exposes only canonical public and role-specific routes", () 
 });
 
 test("Doctor application and profile RBAC preserve Patient and Doctor access", () => {
-  assert.equal(checkRole([Role.PATIENT], Role.PATIENT).passed, true);
-  assert.equal(checkRole([Role.PATIENT], Role.DOCTOR).passed, false);
-  assert.equal(checkRole([Role.PATIENT, Role.DOCTOR], Role.PATIENT).passed, true);
-  assert.equal(checkRole([Role.PATIENT, Role.DOCTOR], Role.DOCTOR).passed, true);
-  assert.ok(checkRole([Role.PATIENT, Role.DOCTOR], Role.ADMIN).error);
+  const applicants = [Role.USER, Role.PATIENT, Role.DOCTOR];
+  assert.equal(checkRole(applicants, Role.USER).passed, true);
+  assert.equal(checkRole(applicants, Role.PATIENT).passed, true);
+  assert.equal(checkRole(applicants, Role.DOCTOR).passed, true);
+  assert.ok(checkRole(applicants, Role.ADMIN).error);
 });
 
 test("Doctor operational routes remain Doctor-only", () => {
   assert.equal(checkRole([Role.DOCTOR], Role.DOCTOR).passed, true);
   assert.equal(checkRole([Role.DOCTOR], Role.PATIENT).passed, false);
+  assert.equal(checkRole([Role.DOCTOR], Role.USER).passed, false);
   assert.equal(checkRole([Role.DOCTOR], Role.ADMIN).passed, false);
 });

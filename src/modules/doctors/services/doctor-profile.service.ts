@@ -1,11 +1,12 @@
 
 import {
+  AccountStatus,
   DoctorApprovalStatus,
   Role,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
-import type { DoctorApplicationInput } from "../doctors.validation.js";
+import type { DoctorApplicationInput, DoctorProfileUpdateInput } from "../doctors.validation.js";
 
 export const submitDoctorApplication = async (
   userId: string,
@@ -54,6 +55,10 @@ export const submitDoctorApplication = async (
   }
 
   const profile = await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: { role: Role.USER },
+    });
     const existing = await tx.doctorProfile.findUnique({
       where: { userId },
       select: { id: true },
@@ -138,4 +143,58 @@ export const getMyDoctorProfile = async (userId: string) => {
   }
 
   return profile;
+};
+
+export const updateMyDoctorProfile = async (
+  userId: string,
+  input: DoctorProfileUpdateInput,
+) => {
+  const doctor = await prisma.doctorProfile.findUnique({
+    where: { userId },
+    select: {
+      id: true,
+      approvalStatus: true,
+      user: { select: { role: true, status: true, deletedAt: true } },
+    },
+  });
+  if (
+    !doctor
+    || doctor.approvalStatus !== DoctorApprovalStatus.APPROVED
+    || doctor.user.role !== Role.DOCTOR
+    || doctor.user.status !== AccountStatus.ACTIVE
+    || doctor.user.deletedAt
+  ) {
+    throw new AppError("Approved active doctor account required", 403);
+  }
+
+  if (input.specializationIds) {
+    const uniqueIds = [...new Set(input.specializationIds)];
+    const count = await prisma.specialization.count({ where: { id: { in: uniqueIds } } });
+    if (count !== uniqueIds.length) {
+      throw new AppError("One or more specializations are invalid", 400);
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    if (input.specializationIds) {
+      await tx.doctorSpecialization.deleteMany({ where: { doctorId: doctor.id } });
+    }
+    return tx.doctorProfile.update({
+      where: { id: doctor.id },
+      data: {
+        qualifications: input.qualifications,
+        experienceYears: input.experienceYears,
+        consultationFee: input.consultationFee,
+        bio: input.bio,
+        ...(input.specializationIds && {
+          specializations: {
+            create: [...new Set(input.specializationIds)].map((specializationId) => ({
+              specialization: { connect: { id: specializationId } },
+            })),
+          },
+        }),
+      },
+      include: { specializations: { include: { specialization: true } } },
+    });
+  });
 };

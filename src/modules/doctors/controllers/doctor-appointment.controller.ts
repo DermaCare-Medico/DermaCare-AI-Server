@@ -3,8 +3,9 @@ import {
   completeDoctorConsultation,
   decideDoctorAppointment,
   getDoctorAppointmentRequests,
+  getDoctorAppointmentHistory,
 } from "../services/doctor-appointment.service.js";
-import { doctorAppointmentDecisionSchema, doctorAppointmentParamsSchema } from "../doctors.validation.js";
+import { doctorAppointmentDecisionSchema, doctorAppointmentHistoryQuerySchema, doctorAppointmentParamsSchema } from "../doctors.validation.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 
@@ -35,6 +36,16 @@ export async function getAppointmentRequestsController(
 ) {
   const data = await getDoctorAppointmentRequests(getUserId(req));
   res.status(HTTP_STATUS.OK).json({ success: true, data });
+}
+
+export async function getAppointmentHistoryController(req: Request, res: Response) {
+  const query = doctorAppointmentHistoryQuerySchema.parse(req.query);
+  const result = await getDoctorAppointmentHistory(getUserId(req), query);
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: result.appointments,
+    pagination: result.pagination,
+  });
 }
 
 export async function decideAppointmentController(

@@ -17,6 +17,7 @@ import {
 import {
   completeConsultationController,
   getAppointmentRequestsController,
+  getAppointmentHistoryController,
   decideAppointmentController,
 } from "./controllers/doctor-appointment.controller.js";
 
@@ -39,15 +40,22 @@ router.get("/:doctorId", doctorController.getById);
 router.post(
   "/application",
   authenticate,
-  authorize(Role.PATIENT),
+  authorize(Role.USER, Role.PATIENT, Role.DOCTOR),
   doctorController.submitApplication,
 );
 
 router.get(
   "/me/profile",
   authenticate,
-  authorize(Role.PATIENT, Role.DOCTOR),
+  authorize(Role.USER, Role.PATIENT, Role.DOCTOR),
   doctorController.getMyProfile,
+);
+
+router.patch(
+  "/me/profile",
+  authenticate,
+  authorize(Role.DOCTOR),
+  doctorController.updateMyProfile,
 );
 
 // Doctor slots
@@ -85,6 +93,13 @@ router.get(
   authenticate,
   authorize(Role.DOCTOR),
   asyncHandler(getAppointmentRequestsController),
+);
+
+router.get(
+  "/me/appointments",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(getAppointmentHistoryController),
 );
 
 router.patch(

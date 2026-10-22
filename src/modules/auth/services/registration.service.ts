@@ -86,7 +86,6 @@ export const registrationService = {
           provider: "PASSWORD",
           passwordHash: payload.passwordHash,
         },
-        notifyAdminsOfDoctorRegistration: payload.role === "DOCTOR",
       }, tx);
     });
 

@@ -36,7 +36,7 @@ apiRouter.use(
 apiRouter.use(
   "/users",
   authenticate,
-  authorize(Role.PATIENT, Role.DOCTOR, Role.ADMIN),
+  authorize(Role.USER, Role.PATIENT, Role.DOCTOR, Role.ADMIN),
   userRoutes,
 );
 apiRouter.use(

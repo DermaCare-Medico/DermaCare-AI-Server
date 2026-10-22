@@ -54,6 +54,7 @@ export const assertPendingDoctorApproval = (
 export const assertDoctorAccountEligibleForApproval = (account: {
     status: AccountStatus;
     deletedAt: Date | null;
+    role?: Role;
 }) => {
     if (
         account.deletedAt
@@ -61,6 +62,14 @@ export const assertDoctorAccountEligibleForApproval = (account: {
         || account.status === AccountStatus.REJECTED
     ) {
         throw new AppError("Doctor account is not eligible for approval", 400);
+    }
+    if (
+        account.role
+        && account.role !== Role.USER
+        && account.role !== Role.PATIENT
+        && account.role !== Role.DOCTOR
+    ) {
+        throw new AppError("Doctor account role is not eligible for approval", 400);
     }
 };
 
@@ -124,7 +133,7 @@ const approveDoctor = async (adminUserId: string, doctorId: string) => {
             select: {
                 approvalStatus: true,
                 userId: true,
-                user: { select: { status: true, deletedAt: true } },
+                user: { select: { status: true, deletedAt: true, role: true } },
             },
         });
         if (!doctor) throw new AppError("Doctor approval request not found", 404);
@@ -227,7 +236,12 @@ const rejectDoctor = async (adminUserId: string, doctorId: string, reason: strin
         }, tx);
         await tx.user.update({
             where: { id: doctor.userId },
-            data: { status: AccountStatus.REJECTED },
+            data: { role: Role.PATIENT, status: AccountStatus.ACTIVE },
+        });
+        await tx.patientProfile.upsert({
+            where: { userId: doctor.userId },
+            create: { userId: doctor.userId },
+            update: {},
         });
 
         const rejected = await tx.doctorProfile.findUniqueOrThrow({

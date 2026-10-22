@@ -231,16 +231,7 @@ test("concurrent OTP verification permits exactly one consumer", async () => {
   assert.equal(results.filter(({ status }) => status === "rejected").length, 1);
 });
 
-test("doctor registration atomically creates its Admin notification", async () => {
-  const admin = await prisma.user.create({
-    data: {
-      name: runTag,
-      email: emails.admin,
-      role: "ADMIN",
-      status: "ACTIVE",
-      emailVerified: true,
-    },
-  });
+test("doctor registration intent creates an active user applicant account", async () => {
   const payload = await registrationPayload("DOCTOR");
   await createOtp(
     emails.doctor,
@@ -252,14 +243,13 @@ test("doctor registration atomically creates its Admin notification", async () =
     { email: emails.doctor, otp: code },
     meta,
   );
-  const notification = await prisma.notification.findFirst({
-    where: {
-      userId: admin.id,
-      notificationType: "ACCOUNT",
-      relatedEntityType: "User",
-      relatedEntityId: result.user.id,
-    },
+  const stored = await prisma.user.findUniqueOrThrow({
+    where: { id: result.user.id },
+    include: { patientProfile: true, doctorProfile: true },
   });
 
-  assert.ok(notification);
+  assert.equal(result.user.role, "USER");
+  assert.equal(stored.role, "USER");
+  assert.equal(stored.patientProfile, null);
+  assert.equal(stored.doctorProfile, null);
 });

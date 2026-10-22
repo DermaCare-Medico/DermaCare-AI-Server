@@ -12,6 +12,7 @@ import { AppError } from "../../../shared/errors/AppError.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 import { createNotificationIfEligible } from "../../notifications/services/notification.service.js";
 import { getConsultationCompletionAction } from "./consultation-completion.rules.js";
+import type { DoctorAppointmentHistoryQuery } from "../doctors.validation.js";
 
 async function getApprovedDoctor(userId: string) {
   const doctor = await prisma.doctorProfile.findUnique({
@@ -67,6 +68,49 @@ export async function getDoctorAppointmentRequests(userId: string) {
     },
     orderBy: { createdAt: "asc" },
   });
+}
+
+export async function getDoctorAppointmentHistory(
+  userId: string,
+  query: DoctorAppointmentHistoryQuery,
+) {
+  const doctor = await getApprovedDoctor(userId);
+  const where: Prisma.AppointmentWhereInput = {
+    doctorId: doctor.id,
+    ...(query.status && { status: query.status }),
+  };
+  const [appointments, total] = await prisma.$transaction([
+    prisma.appointment.findMany({
+      where,
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        cancellationReason: true,
+        videoLink: true,
+        slot: { select: { id: true, startTime: true, endTime: true } },
+        patient: { select: { id: true, user: { select: { id: true, name: true } } } },
+        payments: {
+          where: { purpose: TransactionPurpose.APPOINTMENT },
+          select: { id: true, amount: true, currency: true, status: true, refundStatus: true },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+    }),
+    prisma.appointment.count({ where }),
+  ]);
+  return {
+    appointments,
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages: Math.ceil(total / query.limit),
+    },
+  };
 }
 
 export async function decideDoctorAppointment(

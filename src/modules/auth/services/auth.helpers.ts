@@ -6,7 +6,6 @@ import { AUTH_OTP } from "../../../shared/constants/auth.constants.js";
 import { sendOtpEmail } from "../../../shared/services/email.service.js";
 import {
   AccountStatus,
-  NotificationType,
   Prisma,
   Role,
 } from "../../../generated/prisma/client.js";
@@ -16,7 +15,6 @@ import type {
 } from "../../../types/auth.types.js";
 import { otpService } from "./otp.service.js";
 import { issueSession } from "./token.service.js";
-import { createNotification } from "../../notifications/services/notification.service.js";
 
 export const userSelect = {
   id: true,
@@ -64,15 +62,19 @@ export const assertActive = (user: DbUser): void => {
 export const doctorStatusOf = async (
   user: DbUser,
 ): Promise<string | undefined> => {
-  if (user.role !== Role.DOCTOR) return undefined;
-
   const profile = await prisma.doctorProfile.findUnique({
     where: { userId: user.id },
     select: { approvalStatus: true },
   });
 
-  return profile?.approvalStatus ?? "NO_PROFILE";
+  if (profile) return profile.approvalStatus;
+  return user.role === Role.DOCTOR ? "NO_PROFILE" : undefined;
 };
+
+// DOCTOR is registration intent. Accounts remain ordinary patients until an
+// administrator approves the submitted DoctorProfile.
+export const accountRoleForRegistration = (role: RegisterRole): Role =>
+  role === Role.DOCTOR ? Role.USER : Role.PATIENT;
 
 export const startSession = async (user: DbUser, meta: RequestMeta) => {
   assertActive(user);
@@ -93,7 +95,6 @@ type CreateAccountInput = {
   identity:
     | { provider: "PASSWORD"; passwordHash: string }
     | { provider: "GOOGLE"; sub: string };
-  notifyAdminsOfDoctorRegistration?: boolean;
 };
 
 const createAccountWithClient = async (
@@ -101,12 +102,13 @@ const createAccountWithClient = async (
   tx: Prisma.TransactionClient,
 ): Promise<DbUser> => {
   const now = new Date();
+  const accountRole = accountRoleForRegistration(input.role);
 
   const user = await tx.user.create({
     data: {
       name: input.name,
       email: input.email,
-      role: input.role,
+      role: accountRole,
       emailVerified: true,
       termsAcceptedAt: now,
       privacyAcceptedAt: now,
@@ -132,34 +134,8 @@ const createAccountWithClient = async (
           },
   });
 
-  // A Patient is active immediately; a Doctor adds license details later
-  if (input.role === Role.PATIENT) {
+  if (accountRole === Role.PATIENT) {
     await tx.patientProfile.create({ data: { userId: user.id } });
-  }
-
-  if (input.role === Role.DOCTOR && input.notifyAdminsOfDoctorRegistration) {
-    const admins = await tx.user.findMany({
-      where: {
-        role: Role.ADMIN,
-        status: AccountStatus.ACTIVE,
-        deletedAt: null,
-      },
-      select: { id: true },
-    });
-
-    for (const admin of admins) {
-      await createNotification(
-        {
-          userId: admin.id,
-          title: "New doctor registration",
-          message: "A new doctor account has completed registration.",
-          notificationType: NotificationType.ACCOUNT,
-          relatedEntityType: "User",
-          relatedEntityId: user.id,
-        },
-        tx,
-      );
-    }
   }
 
   return user;

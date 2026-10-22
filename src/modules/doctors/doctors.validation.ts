@@ -10,6 +10,22 @@ export const doctorApplicationSchema = z.object({
   specializationIds: z.array(z.string().uuid()).min(1).max(20),
 });
 
+export const doctorProfileUpdateSchema = z.object({
+  qualifications: z.array(z.string().trim().min(1)).min(1).max(20).optional(),
+  experienceYears: z.number().int().min(0).max(70).optional(),
+  consultationFee: z.number().min(0).max(1000000).optional(),
+  bio: z.string().trim().max(2000).nullable().optional(),
+  specializationIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+}).strict().refine((input) => Object.keys(input).length > 0, {
+  message: "At least one profile field is required",
+});
+
+export const doctorAppointmentHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  status: z.enum(["HELD", "PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"]).optional(),
+}).strict();
+
 export const rejectDoctorApplicationSchema = z.object({
   reason: z.string().trim().min(5).max(1000),
 });
@@ -31,6 +47,8 @@ export const doctorListQuerySchema = z.object({
 export type DoctorApplicationInput = z.infer<
   typeof doctorApplicationSchema
 >;
+export type DoctorProfileUpdateInput = z.infer<typeof doctorProfileUpdateSchema>;
+export type DoctorAppointmentHistoryQuery = z.infer<typeof doctorAppointmentHistoryQuerySchema>;
 export type RejectDoctorApplicationInput = z.infer<
   typeof rejectDoctorApplicationSchema
 >;
