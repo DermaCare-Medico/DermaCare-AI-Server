@@ -55,20 +55,20 @@ export const sendOtpEmail = async (
   purpose: keyof typeof SUBJECTS,
   userName?: string | null,
 ): Promise<void> => {
-  if (!transporter) {
-<<<<<<< HEAD
-    if (env.NODE_ENV === "production") {
-      throw new AppError("Email delivery service is currently unavailable", 503);
-    }
-
-    // In development / test mode without SMTP configured, mock dispatch safely.
-    // Never log the OTP code or full recipient in production/staging.
-    console.info(`[email:dev] Mock email dispatch for ${purpose} to masked recipient`);
-    return;
-=======
-    throw new AppError("Email service is not configured", 500);
->>>>>>> 82ec859397c855eeec47d1624c70e729bdecfb6d
+if (!transporter) {
+  if (env.NODE_ENV === "production") {
+    throw new AppError(
+      "Email delivery service is currently unavailable",
+      503
+    );
   }
+
+  // Development/test only: simulate email dispatch.
+  // Never log OTP codes or recipient email addresses.
+  console.info(`[email:dev] Mock email dispatch for ${purpose}`);
+
+  return;
+}
 
   const minutes = AUTH_OTP.TTL_MS / 60_000;
 
