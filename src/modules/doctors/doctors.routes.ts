@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import { Role } from "../../generated/prisma/client.js";
 import { authenticate } from "../../middlewares/authenticate.middleware.js";
@@ -25,6 +24,8 @@ import {
   createMedicineRequestController,
   getMyMedicineRequestsController,
 } from "./controllers/doctor-medicine-request.controller.js";
+
+import { doctorEarningsController } from "./controllers/doctor-earnings.controller.js";
 
 const router = Router();
 
@@ -129,6 +130,28 @@ router.get(
   authenticate,
   authorize(Role.DOCTOR),
   asyncHandler(getMyMedicineRequestsController),
+);
+
+// Doctor earnings & payouts
+router.get(
+  "/me/earnings/summary",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(doctorEarningsController.getEarningsSummary),
+);
+
+router.get(
+  "/me/earnings/history",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(doctorEarningsController.getEarningsHistory),
+);
+
+router.get(
+  "/me/payouts",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(doctorEarningsController.getPayoutHistory),
 );
 
 export default router;

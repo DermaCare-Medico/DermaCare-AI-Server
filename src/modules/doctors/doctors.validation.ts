@@ -92,3 +92,20 @@ export const createMedicineRequestSchema = z.object({
   manufacturer: z.string().trim().max(255).optional(),
   description: z.string().trim().max(2000).optional(),
 });
+
+
+export const doctorEarningsHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  year: z.coerce.number().int().min(2020).max(2050).optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+}).strict();
+
+export const doctorPayoutListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  status: z.enum(["PENDING", "PROCESSING", "PAID", "FAILED"]).optional(),
+}).strict();
+
+export type DoctorEarningsHistoryQuery = z.infer<typeof doctorEarningsHistoryQuerySchema>;
+export type DoctorPayoutListQuery = z.infer<typeof doctorPayoutListQuerySchema>;

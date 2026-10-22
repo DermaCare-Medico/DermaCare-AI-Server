@@ -264,3 +264,35 @@ export const validateAdminAppointmentId = validateRequest({
     params: appointmentIdAdminParamsSchema,
 });
 export const validateAdminAuditLogList = validateRequest({ query: auditLogListQuerySchema });
+
+const monthlyEarningsQuerySchema = z.object({
+    ...paginationShape,
+    year: z.coerce.number().int().min(2020).max(2050).optional(),
+    month: z.coerce.number().int().min(1).max(12).optional(),
+    doctorId: uuidSchema.optional(),
+}).strict();
+
+const doctorPayableQuerySchema = z.object({
+    year: z.coerce.number().int().min(2020).max(2050).optional(),
+    month: z.coerce.number().int().min(1).max(12).optional(),
+}).strict();
+
+const doctorIdAdminParamsSchema = z.object({
+    doctorId: uuidSchema,
+}).strict();
+
+const generatePayoutBodySchema = z.object({
+    year: z.coerce.number().int().min(2020).max(2050),
+    month: z.coerce.number().int().min(1).max(12),
+    notes: z.string().trim().max(1000).optional(),
+}).strict();
+
+export const validateAdminMonthlyEarningsQuery = validateRequest({ query: monthlyEarningsQuerySchema });
+export const validateDoctorPayable = validateRequest({
+    params: doctorIdAdminParamsSchema,
+    query: doctorPayableQuerySchema,
+});
+export const validateGenerateDoctorPayout = validateRequest({
+    params: doctorIdAdminParamsSchema,
+    body: generatePayoutBodySchema,
+});

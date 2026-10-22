@@ -30,6 +30,9 @@ import {
     validateAdminUserList,
     validateAdminUserId,
     validateAdminUserStatus,
+    validateAdminMonthlyEarningsQuery,
+    validateDoctorPayable,
+    validateGenerateDoctorPayout,
 } from "./admin.validation.js";
 
 const adminRouter = Router();
@@ -44,10 +47,30 @@ adminRouter.get(
     validateAdminPayoutList,
     asyncHandler(doctorPayoutAdminController.listPayouts),
 );
+adminRouter.get(
+    "/doctor-payments/summary",
+    validateAdminMonthlyEarningsQuery,
+    asyncHandler(doctorPayoutAdminController.getMonthlyEarningsSummary),
+);
 adminRouter.post(
     "/doctor-payments/:id/send",
     validateAdminPayoutId,
     asyncHandler(doctorPayoutAdminController.sendPayout),
+);
+adminRouter.get(
+    "/doctors/earnings/summary",
+    validateAdminMonthlyEarningsQuery,
+    asyncHandler(doctorPayoutAdminController.getMonthlyEarningsSummary),
+);
+adminRouter.get(
+    "/doctors/:doctorId/payable",
+    validateDoctorPayable,
+    asyncHandler(doctorPayoutAdminController.getDoctorPayable),
+);
+adminRouter.post(
+    "/doctors/:doctorId/payouts/generate",
+    validateGenerateDoctorPayout,
+    asyncHandler(doctorPayoutAdminController.generatePayout),
 );
 adminRouter.get(
     "/orders",

@@ -54,6 +54,9 @@ test("Doctor router exposes only canonical public and role-specific routes", () 
     { method: "PATCH", path: "/me/appointments/:appointmentId/complete" },
     { method: "POST", path: "/me/medicine-requests" },
     { method: "GET", path: "/me/medicine-requests" },
+    { method: "GET", path: "/me/earnings/summary" },
+    { method: "GET", path: "/me/earnings/history" },
+    { method: "GET", path: "/me/payouts" },
   ]);
   assert.equal(routes.some(({ path }) => path.startsWith("/admin/")), false);
 });
