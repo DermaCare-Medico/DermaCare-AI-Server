@@ -26,7 +26,7 @@ export const stripeRefundIdempotencyKey = (paymentId: string) => `payment-refund
 
 export async function stagePaymentRefunds(
   tx: Prisma.TransactionClient,
-  target: { appointmentId: string } | { orderId: string },
+  target: { appointmentId: string } | { orderId: string } | { id: string },
 ) {
   const payments = await tx.paymentTransaction.findMany({
     where: { ...target, status: TransactionStatus.PAID },
@@ -117,14 +117,14 @@ export async function requestStripeRefund(paymentId: string) {
       status: true,
     },
   });
-  if (!payment || payment.provider !== "STRIPE" || payment.status === TransactionStatus.REFUNDED) return;
-  if (payment.status !== TransactionStatus.PAID) return;
+  if (!payment || payment.provider !== "STRIPE" || payment.status === TransactionStatus.REFUNDED) return true;
+  if (payment.status !== TransactionStatus.PAID) return true;
 
   try {
     if (payment.stripeRefundId) {
       const existing = await stripe().refunds.retrieve(payment.stripeRefundId);
       await persistRefund(payment.id, existing);
-      return;
+      return true;
     }
     const paymentIntentId = await resolvePaymentIntent(payment);
     const intent = await stripe().paymentIntents.retrieve(paymentIntentId);
@@ -143,17 +143,23 @@ export async function requestStripeRefund(paymentId: string) {
       metadata: { paymentTransactionId: payment.id },
     }, { idempotencyKey: stripeRefundIdempotencyKey(payment.id) });
     await persistRefund(payment.id, refund);
+    return true;
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "Stripe refund request failed";
     await prisma.paymentTransaction.updateMany({
       where: { id: payment.id, provider: "STRIPE", status: TransactionStatus.PAID },
       data: { refundStatus: RefundStatus.FAILED, refundError: message },
     });
+    return false;
   }
 }
 
 export async function requestStripeRefunds(paymentIds: string[]) {
-  await Promise.all(paymentIds.map(requestStripeRefund));
+  const results = await Promise.all(paymentIds.map(async (paymentId) => ({
+    paymentId,
+    succeeded: await requestStripeRefund(paymentId),
+  })));
+  return results.filter((result) => !result.succeeded).map((result) => result.paymentId);
 }
 
 export async function reconcileStripeRefund(refund: Stripe.Refund) {

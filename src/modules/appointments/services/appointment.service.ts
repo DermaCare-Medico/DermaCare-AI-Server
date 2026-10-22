@@ -21,6 +21,7 @@ import { requireActiveAdmin } from "../../admin/services/admin.service.js";
 import { canExposeMeeting } from "../../../integrations/google-calendar/meeting-access.rules.js";
 import { presentDoctorSpecializations } from "../../doctors/doctor-specializations.presenter.js";
 import { requestStripeRefunds, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
+import { expireStripeCheckoutSessions } from "../../payments/services/payment-verification.service.js";
 
 const httpError = (statusCode: number, message: string) => new AppError(message, statusCode);
 
@@ -398,7 +399,7 @@ const getAppointmentForAdmin = async (adminUserId: string, appointmentId: string
 
 const cleanupExpiredAppointments = async () => {
     const now = new Date();
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
         const expired = await tx.appointment.findMany({
             where: {
                 OR: [
@@ -421,11 +422,15 @@ const cleanupExpiredAppointments = async () => {
             select: {
                 id: true,
                 slotId: true,
+                payments: {
+                    where: { provider: "STRIPE", status: TransactionStatus.PENDING },
+                    select: { providerTransactionId: true },
+                },
             },
             take: 100,
         });
 
-        if (expired.length === 0) return 0;
+        if (expired.length === 0) return { count: 0, sessionIds: [] as string[] };
 
         const expiredIds = expired.map((a) => a.id);
         const slotIds = expired.map((a) => a.slotId);
@@ -446,8 +451,15 @@ const cleanupExpiredAppointments = async () => {
             data: { status: SlotStatus.AVAILABLE },
         });
 
-        return expired.length;
+        return {
+            count: expired.length,
+            sessionIds: expired.flatMap((appointment) =>
+                appointment.payments.flatMap((payment) =>
+                    payment.providerTransactionId ? [payment.providerTransactionId] : [])),
+        };
     });
+    await expireStripeCheckoutSessions(result.sessionIds);
+    return result.count;
 };
 
 const requestCancellation = async (userId: string, appointmentId: string, reason: string) => {

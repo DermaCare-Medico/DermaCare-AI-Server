@@ -24,6 +24,24 @@ const stripe = () => {
   return stripeClient;
 };
 
+export async function expireStripeCheckoutSessions(
+  sessionIds: string[],
+  expire: (sessionId: string) => Promise<unknown> = (sessionId) =>
+    stripe().checkout.sessions.expire(sessionId),
+) {
+  const uniqueSessionIds = [...new Set(sessionIds)];
+  const results = await Promise.allSettled(uniqueSessionIds.map((sessionId) =>
+    Promise.resolve().then(() => expire(sessionId))));
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.warn("Stripe Checkout Session could not be expired", {
+        sessionId: uniqueSessionIds[index],
+        error: result.reason instanceof Error ? result.reason.message : "Unknown Stripe error",
+      });
+    }
+  });
+}
+
 async function activePatient(userId: string) {
   const user = await prisma.user.findFirst({
     where: { id: userId, role: Role.PATIENT, status: AccountStatus.ACTIVE, deletedAt: null },

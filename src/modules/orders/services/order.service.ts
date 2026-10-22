@@ -4,6 +4,7 @@ import {
     Prisma,
     Role,
     NotificationType,
+    TransactionStatus,
 } from "../../../generated/prisma/client.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { prisma } from "../../../lib/prisma.js";
@@ -26,6 +27,7 @@ import {
     createNotificationIfEligible,
 } from "../../notifications/services/notification.service.js";
 import { requestStripeRefunds, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
+import { expireStripeCheckoutSessions } from "../../payments/services/payment-verification.service.js";
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -482,12 +484,18 @@ const cleanupExpiredUnpaidOrders = async (now = new Date(), batchSize = 100) => 
 
     let cancelled = 0;
     for (const candidate of candidates) {
-        const didCancel = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             const order = await tx.order.findUnique({
                 where: { id: candidate.id },
-                select: { items: { select: { inventoryId: true, quantity: true } } },
+                select: {
+                    items: { select: { inventoryId: true, quantity: true } },
+                    payments: {
+                        where: { provider: "STRIPE", status: TransactionStatus.PENDING },
+                        select: { providerTransactionId: true },
+                    },
+                },
             });
-            if (!order) return false;
+            if (!order) return { didCancel: false, sessionIds: [] as string[] };
 
             const claimed = await tx.order.updateMany({
                 where: {
@@ -503,7 +511,7 @@ const cleanupExpiredUnpaidOrders = async (now = new Date(), batchSize = 100) => 
                 },
                 data: { status: OrderStatus.CANCELLED },
             });
-            if (claimed.count !== 1) return false;
+            if (claimed.count !== 1) return { didCancel: false, sessionIds: [] as string[] };
 
             for (const [inventoryId, quantity] of aggregateInventoryQuantities(order.items)) {
                 await tx.storeInventory.update({
@@ -511,9 +519,16 @@ const cleanupExpiredUnpaidOrders = async (now = new Date(), batchSize = 100) => 
                     data: { stockQuantity: { increment: quantity } },
                 });
             }
-            return true;
+            return {
+                didCancel: true,
+                sessionIds: order.payments.flatMap((payment) =>
+                    payment.providerTransactionId ? [payment.providerTransactionId] : []),
+            };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-        if (didCancel) cancelled += 1;
+        if (result.didCancel) {
+            cancelled += 1;
+            await expireStripeCheckoutSessions(result.sessionIds);
+        }
     }
     return cancelled;
 };
