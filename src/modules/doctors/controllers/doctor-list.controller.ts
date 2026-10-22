@@ -33,6 +33,9 @@ export const doctorListController = {
     res: Response,
     next: NextFunction,
   ) => {
+    if (req.params.doctorId === "me" || req.params.doctorId === "application") {
+      return next();
+    }
     try {
       const { doctorId } = doctorIdParamsSchema.parse(req.params);
       const doctor = await getApprovedDoctorById(doctorId);

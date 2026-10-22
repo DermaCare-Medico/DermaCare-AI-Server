@@ -5,6 +5,8 @@ import { AppError } from "../../../shared/errors/AppError.js";
 import { AUTH_OTP } from "../../../shared/constants/auth.constants.js";
 import type { OtpPurpose, Prisma } from "../../../generated/prisma/client.js";
 
+type OtpClient = Prisma.TransactionClient | typeof prisma;
+
 const generateCode = (): string =>
   crypto.randomInt(0, 10 ** AUTH_OTP.LENGTH).toString().padStart(AUTH_OTP.LENGTH, "0");
 
@@ -67,8 +69,8 @@ export const otpService = {
     await prisma.otpCode.deleteMany({ where: { id } });
   },
 
-  async latestUnused(email: string, purpose: OtpPurpose) {
-    return prisma.otpCode.findFirst({
+  async latestUnused(email: string, purpose: OtpPurpose, client: OtpClient = prisma) {
+    return client.otpCode.findFirst({
       where: { email, purpose, usedAt: null },
       orderBy: { createdAt: "desc" },
     });
@@ -80,8 +82,9 @@ export const otpService = {
     purpose: OtpPurpose;
     code: string;
     consume: boolean;
-  }) {
-    const record = await this.latestUnused(input.email, input.purpose);
+  }, transactionClient?: Prisma.TransactionClient) {
+    const client: OtpClient = transactionClient ?? prisma;
+    const record = await this.latestUnused(input.email, input.purpose, client);
 
     if (!record || record.expiresAt.getTime() < Date.now()) throw invalidCode();
 
@@ -95,14 +98,14 @@ export const otpService = {
       expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 
     if (!matches) {
-      const updated = await prisma.otpCode.update({
+      const updated = await client.otpCode.update({
         where: { id: record.id },
         data: { attempts: { increment: 1 } },
         select: { attempts: true },
       });
       // the 5th wrong attempt cancels the code
       if (updated.attempts >= AUTH_OTP.MAX_ATTEMPTS) {
-        await prisma.otpCode.update({
+        await client.otpCode.update({
           where: { id: record.id },
           data: { usedAt: new Date() },
         });
@@ -113,7 +116,7 @@ export const otpService = {
 
     if (input.consume) {
       // guards against two requests using the same code at once
-      const result = await prisma.otpCode.updateMany({
+      const result = await client.otpCode.updateMany({
         where: { id: record.id, usedAt: null },
         data: { usedAt: new Date() },
       });

@@ -3,7 +3,13 @@ import type { calendar_v3 } from "googleapis";
 import { env } from "../../config/env.js";
 import { createGoogleCalendarClient } from "./oauth-client.js";
 
-export type MeetingInput = { appointmentId: string; startTime: Date; endTime: Date };
+export type MeetingInput = {
+  appointmentId: string;
+  startTime: Date;
+  endTime: Date;
+  patientEmail?: string;
+  doctorEmail?: string;
+};
 export type MeetingResult = { eventId: string; meetUrl: string };
 
 export const googleEventIdForAppointment = (appointmentId: string) =>
@@ -31,6 +37,10 @@ export const createGoogleMeet = async (
         description: "Secure online consultation appointment.",
         start: { dateTime: input.startTime.toISOString() },
         end: { dateTime: input.endTime.toISOString() },
+        attendees: [
+          ...(input.patientEmail ? [{ email: input.patientEmail, displayName: "Patient" }] : []),
+          ...(input.doctorEmail ? [{ email: input.doctorEmail, displayName: "Doctor" }] : []),
+        ],
         conferenceData: {
           createRequest: {
             requestId: `appointment-${input.appointmentId}`,

@@ -154,6 +154,10 @@ const doctorListQuerySchema = z.object({
 }).strict();
 
 const doctorIdParamsSchema = z.object({ id: uuidSchema }).strict();
+const doctorDocumentParamsSchema = z.object({
+    id: uuidSchema,
+    documentIndex: z.coerce.number().int().min(0),
+}).strict();
 
 const doctorApprovalListQuerySchema = z.object({
     ...paginationShape,
@@ -239,6 +243,7 @@ export const validateAdminUserStatus = validateRequest({
 });
 export const validateAdminDoctorList = validateRequest({ query: doctorListQuerySchema });
 export const validateAdminDoctorId = validateRequest({ params: doctorIdParamsSchema });
+export const validateAdminDoctorDocument = validateRequest({ params: doctorDocumentParamsSchema });
 export const validateAdminDoctorApprovalList = validateRequest({
     query: doctorApprovalListQuerySchema,
 });
@@ -264,3 +269,35 @@ export const validateAdminAppointmentId = validateRequest({
     params: appointmentIdAdminParamsSchema,
 });
 export const validateAdminAuditLogList = validateRequest({ query: auditLogListQuerySchema });
+
+const monthlyEarningsQuerySchema = z.object({
+    ...paginationShape,
+    year: z.coerce.number().int().min(2020).max(2050).optional(),
+    month: z.coerce.number().int().min(1).max(12).optional(),
+    doctorId: uuidSchema.optional(),
+}).strict();
+
+const doctorPayableQuerySchema = z.object({
+    year: z.coerce.number().int().min(2020).max(2050).optional(),
+    month: z.coerce.number().int().min(1).max(12).optional(),
+}).strict();
+
+const doctorIdAdminParamsSchema = z.object({
+    doctorId: uuidSchema,
+}).strict();
+
+const generatePayoutBodySchema = z.object({
+    year: z.coerce.number().int().min(2020).max(2050),
+    month: z.coerce.number().int().min(1).max(12),
+    notes: z.string().trim().max(1000).optional(),
+}).strict();
+
+export const validateAdminMonthlyEarningsQuery = validateRequest({ query: monthlyEarningsQuerySchema });
+export const validateDoctorPayable = validateRequest({
+    params: doctorIdAdminParamsSchema,
+    query: doctorPayableQuerySchema,
+});
+export const validateGenerateDoctorPayout = validateRequest({
+    params: doctorIdAdminParamsSchema,
+    body: generatePayoutBodySchema,
+});

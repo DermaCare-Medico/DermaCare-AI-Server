@@ -10,6 +10,10 @@ import { orderController } from "../orders/controllers/order.controller.js";
 import { medicineController } from "../stores/controllers/medicine.controller.js";
 import { appointmentController } from "../appointments/controllers/appointment.controller.js";
 import {
+    validateCancellationDecision,
+    validateDirectCancel,
+} from "../appointments/appointments.validation.js";
+import {
     validateAdminOrderList,
     validateAdminAppointmentId,
     validateAdminAppointmentList,
@@ -18,6 +22,7 @@ import {
     validateAdminOrderStatus,
     validateAdminDoctorList,
     validateAdminDoctorId,
+    validateAdminDoctorDocument,
     validateAdminDoctorApproval,
     validateAdminDoctorApprovalList,
     validateAdminDoctorRejection,
@@ -30,6 +35,9 @@ import {
     validateAdminUserList,
     validateAdminUserId,
     validateAdminUserStatus,
+    validateAdminMonthlyEarningsQuery,
+    validateDoctorPayable,
+    validateGenerateDoctorPayout,
 } from "./admin.validation.js";
 
 const adminRouter = Router();
@@ -44,10 +52,35 @@ adminRouter.get(
     validateAdminPayoutList,
     asyncHandler(doctorPayoutAdminController.listPayouts),
 );
+adminRouter.get(
+    "/doctor-payments/summary",
+    validateAdminMonthlyEarningsQuery,
+    asyncHandler(doctorPayoutAdminController.getMonthlyEarningsSummary),
+);
 adminRouter.post(
     "/doctor-payments/:id/send",
     validateAdminPayoutId,
     asyncHandler(doctorPayoutAdminController.sendPayout),
+);
+adminRouter.get(
+    "/doctor-payments/:id",
+    validateAdminPayoutId,
+    asyncHandler(doctorPayoutAdminController.getPayout),
+);
+adminRouter.get(
+    "/doctors/earnings/summary",
+    validateAdminMonthlyEarningsQuery,
+    asyncHandler(doctorPayoutAdminController.getMonthlyEarningsSummary),
+);
+adminRouter.get(
+    "/doctors/:doctorId/payable",
+    validateDoctorPayable,
+    asyncHandler(doctorPayoutAdminController.getDoctorPayable),
+);
+adminRouter.post(
+    "/doctors/:doctorId/payouts/generate",
+    validateGenerateDoctorPayout,
+    asyncHandler(doctorPayoutAdminController.generatePayout),
 );
 adminRouter.get(
     "/orders",
@@ -83,6 +116,11 @@ adminRouter.get(
     "/doctors",
     validateAdminDoctorList,
     asyncHandler(userManagementController.listDoctors),
+);
+adminRouter.get(
+    "/doctors/:id/documents/:documentIndex",
+    validateAdminDoctorDocument,
+    asyncHandler(doctorVerificationController.downloadDoctorDocument),
 );
 adminRouter.get(
     "/doctors/:id",
@@ -138,6 +176,26 @@ adminRouter.get(
     "/appointments/:id",
     validateAdminAppointmentId,
     asyncHandler(appointmentController.getAppointmentForAdmin),
+);
+adminRouter.patch(
+    "/appointments/:id/cancellation",
+    validateCancellationDecision,
+    asyncHandler(appointmentController.reviewCancellationController),
+);
+adminRouter.post(
+    "/appointments/:id/cancel",
+    validateDirectCancel,
+    asyncHandler(appointmentController.cancelAppointmentController),
+);
+adminRouter.patch(
+    "/appointments/:id/no-show",
+    validateAdminAppointmentId,
+    asyncHandler(appointmentController.markNoShowController),
+);
+adminRouter.post(
+    "/appointments/:id/meeting/retry",
+    validateAdminAppointmentId,
+    asyncHandler(adminController.retryMeetingProvisioning),
 );
 adminRouter.get(
     "/audit-logs",

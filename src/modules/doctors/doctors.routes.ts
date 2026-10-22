@@ -1,19 +1,23 @@
-
 import { Router } from "express";
 import { Role } from "../../generated/prisma/client.js";
 import { authenticate } from "../../middlewares/authenticate.middleware.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
 import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
+import { uploadScreeningImage } from "../../middlewares/upload.middleware.js";
 import { doctorController } from "./doctor.controller.js";
 
 import {
   createSlotController,
+  deleteSlotController,
+  getAvailableSlotsController,
   getMySlotsController,
   updateSlotController,
 } from "./controllers/doctor-slot.controller.js";
 
 import {
+  completeConsultationController,
   getAppointmentRequestsController,
+  getAppointmentHistoryController,
   decideAppointmentController,
 } from "./controllers/doctor-appointment.controller.js";
 
@@ -22,45 +26,53 @@ import {
   getMyMedicineRequestsController,
 } from "./controllers/doctor-medicine-request.controller.js";
 
+import { doctorEarningsController } from "./controllers/doctor-earnings.controller.js";
+
 const router = Router();
 
 // Public: approved doctors only
 router.get("/", doctorController.list);
+router.get(
+  "/:doctorId/slots",
+  asyncHandler(getAvailableSlotsController),
+);
 router.get("/:doctorId", doctorController.getById);
 
 // Authenticated user: apply and view own application
 router.post(
+  "/application/documents",
+  authenticate,
+  authorize(Role.USER, Role.PATIENT, Role.DOCTOR),
+  uploadScreeningImage,
+  doctorController.uploadApplicationDocument,
+);
+
+router.post(
   "/application",
   authenticate,
+  authorize(Role.USER, Role.PATIENT, Role.DOCTOR),
   doctorController.submitApplication,
+);
+
+router.get(
+  "/me/application-documents/:documentIndex",
+  authenticate,
+  authorize(Role.USER, Role.PATIENT, Role.DOCTOR),
+  doctorController.downloadApplicationDocument,
 );
 
 router.get(
   "/me/profile",
   authenticate,
+  authorize(Role.USER, Role.PATIENT, Role.DOCTOR),
   doctorController.getMyProfile,
 );
 
-// Admin-only application review
-router.get(
-  "/admin/applications/pending",
-  authenticate,
-  authorize(Role.ADMIN),
-  doctorController.getPendingApplications,
-);
-
 router.patch(
-  "/admin/applications/:applicationId/approve",
+  "/me/profile",
   authenticate,
-  authorize(Role.ADMIN),
-  doctorController.approve,
-);
-
-router.patch(
-  "/admin/applications/:applicationId/reject",
-  authenticate,
-  authorize(Role.ADMIN),
-  doctorController.reject,
+  authorize(Role.DOCTOR),
+  doctorController.updateMyProfile,
 );
 
 // Doctor slots
@@ -85,6 +97,13 @@ router.patch(
   asyncHandler(updateSlotController),
 );
 
+router.delete(
+  "/me/slots/:slotId",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(deleteSlotController),
+);
+
 // Doctor appointment requests
 router.get(
   "/me/appointment-requests",
@@ -93,11 +112,25 @@ router.get(
   asyncHandler(getAppointmentRequestsController),
 );
 
+router.get(
+  "/me/appointments",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(getAppointmentHistoryController),
+);
+
 router.patch(
   "/me/appointments/:appointmentId/decision",
   authenticate,
   authorize(Role.DOCTOR),
   asyncHandler(decideAppointmentController),
+);
+
+router.patch(
+  "/me/appointments/:appointmentId/complete",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(completeConsultationController),
 );
 
 // Doctor medicine requests
@@ -113,6 +146,28 @@ router.get(
   authenticate,
   authorize(Role.DOCTOR),
   asyncHandler(getMyMedicineRequestsController),
+);
+
+// Doctor earnings & payouts
+router.get(
+  "/me/earnings/summary",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(doctorEarningsController.getEarningsSummary),
+);
+
+router.get(
+  "/me/earnings/history",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(doctorEarningsController.getEarningsHistory),
+);
+
+router.get(
+  "/me/payouts",
+  authenticate,
+  authorize(Role.DOCTOR),
+  asyncHandler(doctorEarningsController.getPayoutHistory),
 );
 
 export default router;

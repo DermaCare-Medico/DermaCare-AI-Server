@@ -12,6 +12,8 @@ import adminRoutes from "../modules/admin/admin.routes.js";
 import userRoutes from "../modules/user/user.module.js";
 import storeRoutes from "../modules/stores/stores.routes.js";
 import orderRoutes from "../modules/orders/orders.routes.js";
+import prescriptionRoutes from "../modules/prescriptions/prescriptions.routes.js";
+import conversationRoutes from "../modules/conversations/conversations.routes.js";
 
 import screeningRoutes from "../modules/screenings/screenings.routes.js";
 
@@ -34,7 +36,7 @@ apiRouter.use(
 apiRouter.use(
   "/users",
   authenticate,
-  authorize(Role.ADMIN),
+  authorize(Role.USER, Role.PATIENT, Role.DOCTOR, Role.ADMIN),
   userRoutes,
 );
 apiRouter.use(
@@ -47,6 +49,8 @@ apiRouter.use(
   authenticate,
   authorize(Role.PATIENT, Role.DOCTOR),
   appointmentRoutes,
+  prescriptionRoutes,
+  conversationRoutes,
 );
 apiRouter.use(
   authenticate,
@@ -54,11 +58,10 @@ apiRouter.use(
   patientRoutes,
   paymentRoutes,
   orderRoutes,
-  doctorRoutes,
 );
 
 apiRouter.use("/screenings", screeningRoutes);
 
-apiRouter.use("/api/doctors", doctorRoutes);
+apiRouter.use("/doctors", doctorRoutes);
 
 export default apiRouter;

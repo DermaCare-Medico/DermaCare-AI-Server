@@ -32,9 +32,79 @@ const sendPayout = async (req: Request, res: Response) => {
     return res.status(HTTP_STATUS.OK).json({
         success: true,
         statusCode: HTTP_STATUS.OK,
-        message: "Doctor payout sent successfully",
+        message: "Doctor payout checkout created successfully",
         data: payout,
     });
 };
 
-export const doctorPayoutAdminController = { listPayouts, sendPayout };
+const getPayout = async (req: Request, res: Response) => res.status(HTTP_STATUS.OK).json({
+    success: true,
+    statusCode: HTTP_STATUS.OK,
+    message: "Doctor payout retrieved successfully",
+    data: await doctorPayoutAdminService.getPayout(getUserId(req), req.params.id!),
+});
+
+const getMonthlyEarningsSummary = async (req: Request, res: Response) => {
+    const result = await doctorPayoutAdminService.getMonthlyEarningsSummary(getUserId(req), {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+        year: req.query.year ? Number(req.query.year) : undefined,
+        month: req.query.month ? Number(req.query.month) : undefined,
+        doctorId: req.query.doctorId as string | undefined,
+    });
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Doctor monthly earnings summary retrieved successfully",
+        data: result.summaries,
+        pagination: result.pagination,
+    });
+};
+
+const getDoctorPayable = async (req: Request, res: Response) => {
+    const result = await doctorPayoutAdminService.getDoctorPayable(
+        getUserId(req),
+        req.params.doctorId!,
+        {
+            year: req.query.year ? Number(req.query.year) : undefined,
+            month: req.query.month ? Number(req.query.month) : undefined,
+        },
+    );
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Doctor payable details retrieved successfully",
+        data: result,
+    });
+};
+
+const generatePayout = async (req: Request, res: Response) => {
+    const result = await doctorPayoutAdminService.generateMonthlyPayout(
+        getUserId(req),
+        req.params.doctorId!,
+        {
+            year: Number(req.body.year),
+            month: Number(req.body.month),
+            notes: req.body.notes,
+        },
+    );
+
+    const status = result.isIdempotent ? HTTP_STATUS.OK : HTTP_STATUS.CREATED;
+    return res.status(status).json({
+        success: true,
+        statusCode: status,
+        message: result.message,
+        data: result.payout,
+    });
+};
+
+export const doctorPayoutAdminController = {
+    listPayouts,
+    getPayout,
+    sendPayout,
+    getMonthlyEarningsSummary,
+    getDoctorPayable,
+    generatePayout,
+};

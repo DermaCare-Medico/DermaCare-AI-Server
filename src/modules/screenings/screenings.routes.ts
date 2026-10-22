@@ -7,6 +7,7 @@ import { uploadScreeningImage } from "../../middlewares/upload.middleware.js";
 import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 
 import { uploadScreeningImageController } from "./controllers/screening-image.controller.js";
+import { createScreeningController } from "./controllers/screening-questionnaire.controller.js";
 import {
   getScreeningHistoryController,
   getScreeningHistoryItemController,
@@ -14,11 +15,17 @@ import {
 import {
   screeningDoctorRecommendationController,
 } from "./controllers/doctor-recommendation.controller.js";
+import { processScreeningPredictionController } from "./controllers/screening-prediction.controller.js";
 
 const router = Router();
 
 router.use(authenticate);
 router.use(authorize("PATIENT"));
+
+router.post(
+  "/",
+  asyncHandler(createScreeningController),
+);
 
 router.post(
   "/images",
@@ -34,6 +41,11 @@ router.get(
 router.get(
   "/history/:screeningId",
   asyncHandler(getScreeningHistoryItemController),
+);
+
+router.post(
+  "/:screeningId/retry",
+  asyncHandler(processScreeningPredictionController),
 );
 
 router.get(

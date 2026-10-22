@@ -19,13 +19,13 @@ model Prescription {
 model PrescriptionItem {
   id             String       @id @default(uuid()) @db.Uuid
   prescriptionId String       @map("prescription_id") @db.Uuid
-  medicineId     String       @map("medicine_id") @db.Uuid
+  medicineId     String?      @map("medicine_id") @db.Uuid
   medicineName   String       @map("medicine_name") @db.VarChar(255)
   dosage         String       @db.VarChar(100)
   frequency      String       @db.VarChar(100)
   duration       String       @db.VarChar(100)
   instructions   String?
-  medicine       Medicine     @relation(fields: [medicineId], references: [id])
+  medicine       Medicine?    @relation(fields: [medicineId], references: [id])
   prescription   Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
 
   @@index([prescriptionId])

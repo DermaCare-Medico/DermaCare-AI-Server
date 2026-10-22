@@ -1,8 +1,18 @@
 import type { Request, Response } from "express";
 
+import { env } from "../../../config/env.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { paymentService } from "../services/payment.service.js";
+
+const ensureDemoPaymentsEnabled = () => {
+    if (env.NODE_ENV === "production" || !env.ALLOW_DEMO_PAYMENTS) {
+        throw new AppError(
+            "Demo payments are disabled in this environment. Use Stripe checkout.",
+            HTTP_STATUS.FORBIDDEN,
+        );
+    }
+};
 
 const getUserId = (req: Request) => {
     const userId = req.auth?.userId;
@@ -13,6 +23,7 @@ const getUserId = (req: Request) => {
 };
 
 const payForAppointmentController = async (req: Request, res: Response) => {
+    ensureDemoPaymentsEnabled();
     const payment = await paymentService.payForAppointment(
         getUserId(req),
         req.params.id!,
@@ -43,6 +54,7 @@ const getAppointmentPaymentController = async (req: Request, res: Response) => {
 };
 
 const payForOrderController = async (req: Request, res: Response) => {
+    ensureDemoPaymentsEnabled();
     const payment = await paymentService.payForOrder(
         getUserId(req),
         req.params.id!,

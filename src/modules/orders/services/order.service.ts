@@ -4,6 +4,7 @@ import {
     Prisma,
     Role,
     NotificationType,
+    TransactionStatus,
 } from "../../../generated/prisma/client.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { prisma } from "../../../lib/prisma.js";
@@ -21,7 +22,12 @@ import {
     getOrderPaymentExpiry,
 } from "./order-payment.rules.js";
 import { getAllowedOrderTransitions } from "./order-status.rules.js";
-import { createNotification } from "../../notifications/services/notification.service.js";
+import {
+    createNotification,
+    createNotificationIfEligible,
+} from "../../notifications/services/notification.service.js";
+import { requestStripeRefundsWithResult, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
+import { expireStripeCheckoutSessions } from "../../payments/services/payment-verification.service.js";
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -336,6 +342,8 @@ const orderDetailsSelect = {
             status: true,
             provider: true,
             paidAt: true,
+            refundStatus: true,
+            refundedAt: true,
         },
         orderBy: { createdAt: "desc" as const },
     },
@@ -359,7 +367,7 @@ const updateOrderStatusForAdmin = async (
 ) => {
     await requireActiveAdmin(adminUserId);
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
         const existing = await tx.order.findUnique({
             where: { id: orderId },
             select: {
@@ -378,6 +386,14 @@ const updateOrderStatusForAdmin = async (
             },
         });
         if (!existing) throw new AppError("Order not found", 404);
+        if (existing.status === OrderStatus.CANCELLED && input.status === OrderStatus.CANCELLED) {
+            const refundPaymentIds = await stagePaymentRefunds(tx, { orderId });
+            const order = await tx.order.findUniqueOrThrow({
+                where: { id: orderId },
+                select: orderDetailsSelect,
+            });
+            return { order, refundPaymentIds };
+        }
         if (!getAllowedOrderTransitions(existing.status).includes(input.status)) {
             throw new AppError(
                 `Order cannot transition from ${existing.status} to ${input.status}`,
@@ -404,6 +420,7 @@ const updateOrderStatusForAdmin = async (
         });
         if (updated.count !== 1) throw new AppError("Order status changed; please retry", 409);
 
+        let refundPaymentIds: string[] = [];
         if (input.status === OrderStatus.CANCELLED) {
             const quantitiesByInventory = aggregateInventoryQuantities(existing.items);
 
@@ -413,6 +430,8 @@ const updateOrderStatusForAdmin = async (
                     data: { stockQuantity: { increment: quantity } },
                 });
             }
+
+            refundPaymentIds = await stagePaymentRefunds(tx, { orderId });
         }
 
         await tx.auditLog.create({
@@ -427,7 +446,7 @@ const updateOrderStatusForAdmin = async (
             },
         });
 
-        await createNotification({
+        await createNotificationIfEligible({
             userId: existing.patient.userId,
             title: "Order status updated",
             message: `Your medicine order status is now ${input.status}.`,
@@ -436,11 +455,14 @@ const updateOrderStatusForAdmin = async (
             relatedEntityId: orderId,
         }, tx);
 
-        return tx.order.findUniqueOrThrow({
+        const order = await tx.order.findUniqueOrThrow({
             where: { id: orderId },
             select: orderDetailsSelect,
         });
+        return { order, refundPaymentIds };
     });
+    const refund = await requestStripeRefundsWithResult(result.refundPaymentIds);
+    return { ...result.order, refund };
 };
 
 const cleanupExpiredUnpaidOrders = async (now = new Date(), batchSize = 100) => {
@@ -462,12 +484,18 @@ const cleanupExpiredUnpaidOrders = async (now = new Date(), batchSize = 100) => 
 
     let cancelled = 0;
     for (const candidate of candidates) {
-        const didCancel = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             const order = await tx.order.findUnique({
                 where: { id: candidate.id },
-                select: { items: { select: { inventoryId: true, quantity: true } } },
+                select: {
+                    items: { select: { inventoryId: true, quantity: true } },
+                    payments: {
+                        where: { provider: "STRIPE", status: TransactionStatus.PENDING },
+                        select: { providerTransactionId: true },
+                    },
+                },
             });
-            if (!order) return false;
+            if (!order) return { didCancel: false, sessionIds: [] as string[] };
 
             const claimed = await tx.order.updateMany({
                 where: {
@@ -483,7 +511,7 @@ const cleanupExpiredUnpaidOrders = async (now = new Date(), batchSize = 100) => 
                 },
                 data: { status: OrderStatus.CANCELLED },
             });
-            if (claimed.count !== 1) return false;
+            if (claimed.count !== 1) return { didCancel: false, sessionIds: [] as string[] };
 
             for (const [inventoryId, quantity] of aggregateInventoryQuantities(order.items)) {
                 await tx.storeInventory.update({
@@ -491,9 +519,16 @@ const cleanupExpiredUnpaidOrders = async (now = new Date(), batchSize = 100) => 
                     data: { stockQuantity: { increment: quantity } },
                 });
             }
-            return true;
+            return {
+                didCancel: true,
+                sessionIds: order.payments.flatMap((payment) =>
+                    payment.providerTransactionId ? [payment.providerTransactionId] : []),
+            };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-        if (didCancel) cancelled += 1;
+        if (result.didCancel) {
+            cancelled += 1;
+            await expireStripeCheckoutSessions(result.sessionIds);
+        }
     }
     return cancelled;
 };

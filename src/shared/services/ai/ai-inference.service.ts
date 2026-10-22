@@ -15,13 +15,30 @@ interface ModelResources {
   preprocessorConfig: PreprocessorConfig;
 }
 
+export class UnusableScreeningImageError extends Error {
+  constructor(message = "Screening image could not be processed") {
+    super(message);
+    this.name = "UnusableScreeningImageError";
+  }
+}
+
 const MODEL_DIR = path.resolve(
   process.cwd(),
   "model",
   "vit-skin-disease"
 );
 
-const MODEL_PATH = path.join(MODEL_DIR, "model.onnx");
+const INT8_MODEL_PATH = path.join(MODEL_DIR, "model-int8.onnx");
+const FP32_MODEL_PATH = path.join(MODEL_DIR, "model.onnx");
+
+async function resolveModelPath(): Promise<string> {
+  try {
+    await fs.access(INT8_MODEL_PATH);
+    return INT8_MODEL_PATH;
+  } catch {
+    return FP32_MODEL_PATH;
+  }
+}
 const CONFIG_PATH = path.join(MODEL_DIR, "config.json");
 const PREPROCESSOR_CONFIG_PATH = path.join(
   MODEL_DIR,
@@ -86,7 +103,8 @@ async function loadResources(): Promise<ModelResources> {
 
   validatePreprocessorConfig(preprocessorConfig);
 
-  const session = await ort.InferenceSession.create(MODEL_PATH, {
+  const modelPath = await resolveModelPath();
+  const session = await ort.InferenceSession.create(modelPath, {
     executionProviders: ["cpu"],
   });
 
@@ -122,16 +140,22 @@ async function preprocessImage(
 ): Promise<ort.Tensor> {
   const { width, height } = config.size;
 
-  const { data, info } = await sharp(imagePath)
-    .rotate()
-    .resize(width, height, {
-      fit: "fill",
-      kernel: sharp.kernel.linear,
-    })
-    .removeAlpha()
-    .toColourspace("srgb")
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+  let data: Buffer;
+  let info: { width: number; height: number; channels: number };
+  try {
+    ({ data, info } = await sharp(imagePath)
+      .rotate()
+      .resize(width, height, {
+        fit: "fill",
+        kernel: sharp.kernel.linear,
+      })
+      .removeAlpha()
+      .toColourspace("srgb")
+      .raw()
+      .toBuffer({ resolveWithObject: true }));
+  } catch {
+    throw new UnusableScreeningImageError();
+  }
 
   if (
     info.width !== width ||

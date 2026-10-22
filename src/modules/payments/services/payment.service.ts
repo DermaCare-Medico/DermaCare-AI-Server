@@ -9,6 +9,7 @@ import {
     Role,
     TransactionPurpose,
     TransactionStatus,
+    SlotStatus,
     MeetingProvisioningStatus,
     NotificationType,
 } from "../../../generated/prisma/client.js";
@@ -22,6 +23,16 @@ import {
 } from "../../orders/services/order-payment.rules.js";
 import { requestMeetingProvisioning } from "../../../integrations/google-calendar/meeting-provisioning.worker.js";
 import { createNotification } from "../../notifications/services/notification.service.js";
+import { env } from "../../../config/env.js";
+
+const ensureDemoPaymentsAllowed = () => {
+    if (env.NODE_ENV === "production" || !env.ALLOW_DEMO_PAYMENTS) {
+        throw new AppError(
+            "Demo payments are disabled in this environment. Use Stripe checkout.",
+            HTTP_STATUS.FORBIDDEN,
+        );
+    }
+};
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -52,6 +63,7 @@ const getActivePatient = async (userId: string) => {
 };
 
 const payForAppointment = async (userId: string, appointmentId: string) => {
+    ensureDemoPaymentsAllowed();
     const patient = await getActivePatient(userId);
 
     try {
@@ -64,6 +76,9 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
                 select: {
                     id: true,
                     status: true,
+                    slotId: true,
+                    doctorId: true,
+                    holdExpiresAt: true,
                     doctor: {
                         select: {
                             userId: true,
@@ -102,6 +117,13 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
                 );
             }
 
+            if (appointment.holdExpiresAt && appointment.holdExpiresAt <= new Date()) {
+                throw new AppError(
+                    "Appointment payment window has expired",
+                    HTTP_STATUS.CONFLICT,
+                );
+            }
+
             const confirmed = await tx.appointment.updateMany({
                 where: {
                     id: appointment.id,
@@ -128,6 +150,15 @@ const payForAppointment = async (userId: string, appointmentId: string) => {
                     HTTP_STATUS.CONFLICT,
                 );
             }
+
+            await tx.doctorSlot.updateMany({
+                where: {
+                    id: appointment.slotId,
+                    doctorId: appointment.doctorId,
+                    status: SlotStatus.HELD,
+                },
+                data: { status: SlotStatus.BOOKED },
+            });
 
             const paidAt = new Date();
             const payment = await tx.paymentTransaction.create({
@@ -217,6 +248,8 @@ const getAppointmentPayment = async (userId: string, appointmentId: string) => {
                     amount: true,
                     currency: true,
                     paidAt: true,
+                    refundStatus: true,
+                    refundedAt: true,
                 },
             },
         },
@@ -240,6 +273,7 @@ const payForOrder = async (
     orderId: string,
     input: OrderPaymentInput,
 ) => {
+    ensureDemoPaymentsAllowed();
     const patient = await getActivePatient(userId);
 
     try {
@@ -359,6 +393,8 @@ const getOrderPayment = async (userId: string, orderId: string) => {
                     currency: true,
                     provider: true,
                     paidAt: true,
+                    refundStatus: true,
+                    refundedAt: true,
                     createdAt: true,
                 },
             },

@@ -93,7 +93,7 @@ enum ScreeningStatus {
   PROCESSING
   COMPLETED
   FAILED
-
+  
   @@map("screening_status")
 }
 
@@ -149,6 +149,14 @@ enum TransactionStatus {
   REFUNDED
 
   @@map("transaction_status")
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+
+  @@map("refund_status")
 }
 
 enum TransactionPurpose {

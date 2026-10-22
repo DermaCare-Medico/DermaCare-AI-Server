@@ -9,7 +9,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test:orders": "tsx --test src/modules/orders/services/order-payment.rules.test.ts",
+    "test:orders": "tsx --test src/modules/orders/services/*.test.ts",
+    "test:auth:integration": "tsx --test src/modules/auth/services/auth-otp.integration.test.ts",
+    "test:payments:integration": "tsx --test src/modules/payments/services/payments-orders.integration.test.ts",
     "test:meetings": "tsx --test src/integrations/google-calendar/*.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -49,6 +51,7 @@
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
     "sharp": "^0.35.5",
+    "stripe": "^23.0.0",
     "swagger-ui-express": "^5.0.1",
     "yaml": "^2.7.0",
     "zod": "^4.6.7"

@@ -34,6 +34,7 @@ model Appointment {
 
   @@index([slotId])
   @@index([patientId, status])
+  @@index([status, patientId])
   @@index([doctorId, status])
   @@index([status, holdExpiresAt])
   @@index([meetingProvisioningStatus, meetingProvisioningNextAttemptAt])

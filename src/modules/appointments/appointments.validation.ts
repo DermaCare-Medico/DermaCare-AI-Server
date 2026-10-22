@@ -45,3 +45,31 @@ export const validateAppointmentListQuery = validateRequest({
 export const validateAppointmentId = validateRequest({
     params: appointmentIdParamsSchema,
 });
+
+const cancellationRequestSchema = z.object({
+    reason: z.string().trim().min(1, "Reason is required").max(1000),
+}).strict();
+
+const cancellationDecisionSchema = z.object({
+    action: z.enum(["APPROVE", "REJECT"]),
+    reviewNotes: z.string().trim().min(1, "Review notes are required").max(1000),
+}).strict();
+
+const directCancelSchema = z.object({
+    reason: z.string().trim().min(1, "Reason is required").max(1000),
+}).strict();
+
+export const validateCancellationRequest = validateRequest({
+    params: appointmentIdParamsSchema,
+    body: cancellationRequestSchema,
+});
+
+export const validateCancellationDecision = validateRequest({
+    params: appointmentIdParamsSchema,
+    body: cancellationDecisionSchema,
+});
+
+export const validateDirectCancel = validateRequest({
+    params: appointmentIdParamsSchema,
+    body: directCancelSchema,
+});

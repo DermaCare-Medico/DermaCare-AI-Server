@@ -1,11 +1,56 @@
 
 import {
+  AccountStatus,
   DoctorApprovalStatus,
   Role,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
-import type { DoctorApplicationInput } from "../doctors.validation.js";
+import type { DoctorApplicationInput, DoctorProfileUpdateInput } from "../doctors.validation.js";
+import { downloadPrivateImage, uploadPrivateImage } from "../../../shared/services/cloudinary/cloudinary.service.js";
+
+export const doctorDocumentBelongsToUser = (reference: string, userId: string) => {
+  const escapedUserId = userId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `^DermaCare-AI/doctor-documents/${escapedUserId}/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$`,
+  ).test(reference);
+};
+
+export const selectOwnedDoctorDocument = (
+  references: string[],
+  documentIndex: number,
+  userId: string,
+) => {
+  const reference = references[documentIndex];
+  if (!reference) throw new AppError("Doctor document not found", 404);
+  if (!doctorDocumentBelongsToUser(reference, userId)) {
+    throw new AppError("Doctor document access denied", 403);
+  }
+  return reference;
+};
+
+export const downloadMyDoctorDocument = async (userId: string, documentIndex: number) => {
+  const profile = await prisma.doctorProfile.findUnique({
+    where: { userId },
+    select: { documentReferences: true },
+  });
+  if (!profile) throw new AppError("Doctor application not found", 404);
+  return downloadPrivateImage(selectOwnedDoctorDocument(
+    profile.documentReferences,
+    documentIndex,
+    userId,
+  ));
+};
+
+export const storeDoctorApplicationDocument = async (userId: string, filePath: string) => {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null, role: { in: [Role.USER, Role.PATIENT, Role.DOCTOR] } },
+    select: { id: true },
+  });
+  if (!user) throw new AppError("Doctor document owner not found", 403);
+  const uploaded = await uploadPrivateImage(filePath, `DermaCare-AI/doctor-documents/${userId}`);
+  return uploaded.public_id;
+};
 
 export const submitDoctorApplication = async (
   userId: string,
@@ -35,6 +80,9 @@ export const submitDoctorApplication = async (
   if (user.role === Role.ADMIN || user.role === Role.STORE_OWNER) {
     throw new AppError("This account cannot apply as a doctor", 403);
   }
+  if (input.documentReferences.some((reference) => !doctorDocumentBelongsToUser(reference, userId))) {
+    throw new AppError("Doctor document does not belong to this account", 403);
+  }
 
   if (
     user.doctorProfile?.approvalStatus === DoctorApprovalStatus.APPROVED
@@ -54,6 +102,10 @@ export const submitDoctorApplication = async (
   }
 
   const profile = await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: { role: Role.USER },
+    });
     const existing = await tx.doctorProfile.findUnique({
       where: { userId },
       select: { id: true },
@@ -72,6 +124,7 @@ export const submitDoctorApplication = async (
           experienceYears: input.experienceYears,
           consultationFee: input.consultationFee,
           bio: input.bio,
+          documentReferences: input.documentReferences,
           approvalStatus: DoctorApprovalStatus.PENDING,
           approvedById: null,
           approvedAt: null,
@@ -100,6 +153,7 @@ export const submitDoctorApplication = async (
         experienceYears: input.experienceYears,
         consultationFee: input.consultationFee,
         bio: input.bio,
+        documentReferences: input.documentReferences,
         approvalStatus: DoctorApprovalStatus.PENDING,
         specializations: {
           create: input.specializationIds.map((specializationId) => ({
@@ -138,4 +192,58 @@ export const getMyDoctorProfile = async (userId: string) => {
   }
 
   return profile;
+};
+
+export const updateMyDoctorProfile = async (
+  userId: string,
+  input: DoctorProfileUpdateInput,
+) => {
+  const doctor = await prisma.doctorProfile.findUnique({
+    where: { userId },
+    select: {
+      id: true,
+      approvalStatus: true,
+      user: { select: { role: true, status: true, deletedAt: true } },
+    },
+  });
+  if (
+    !doctor
+    || doctor.approvalStatus !== DoctorApprovalStatus.APPROVED
+    || doctor.user.role !== Role.DOCTOR
+    || doctor.user.status !== AccountStatus.ACTIVE
+    || doctor.user.deletedAt
+  ) {
+    throw new AppError("Approved active doctor account required", 403);
+  }
+
+  if (input.specializationIds) {
+    const uniqueIds = [...new Set(input.specializationIds)];
+    const count = await prisma.specialization.count({ where: { id: { in: uniqueIds } } });
+    if (count !== uniqueIds.length) {
+      throw new AppError("One or more specializations are invalid", 400);
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    if (input.specializationIds) {
+      await tx.doctorSpecialization.deleteMany({ where: { doctorId: doctor.id } });
+    }
+    return tx.doctorProfile.update({
+      where: { id: doctor.id },
+      data: {
+        qualifications: input.qualifications,
+        experienceYears: input.experienceYears,
+        consultationFee: input.consultationFee,
+        bio: input.bio,
+        ...(input.specializationIds && {
+          specializations: {
+            create: [...new Set(input.specializationIds)].map((specializationId) => ({
+              specialization: { connect: { id: specializationId } },
+            })),
+          },
+        }),
+      },
+      include: { specializations: { include: { specialization: true } } },
+    });
+  });
 };

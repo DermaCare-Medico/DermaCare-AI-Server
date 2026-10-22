@@ -66,26 +66,27 @@ export const registrationService = {
     input: { email: string; otp: string },
     meta: RequestMeta,
   ) {
-    const record = await otpService.verify({
-      email: input.email,
-      purpose: "EMAIL_VERIFICATION",
-      code: input.otp,
-      consume: true,
-    });
+    const user = await prisma.$transaction(async (tx) => {
+      const record = await otpService.verify({
+        email: input.email,
+        purpose: "EMAIL_VERIFICATION",
+        code: input.otp,
+        consume: true,
+      }, tx);
 
-    const payload = record.payload as unknown as RegisterPayload | null;
-    if (!payload) throw new AppError("Invalid or expired code", 400);
+      const payload = record.payload as unknown as RegisterPayload | null;
+      if (!payload) throw new AppError("Invalid or expired code", 400);
 
-    const user = await createAccount({
-      name: payload.name,
-      email: input.email,
-      role: payload.role,
-      consentVersion: payload.consentVersion,
-      identity: {
-        provider: "PASSWORD",
-        passwordHash: payload.passwordHash,
-      },
-      notifyAdminsOfDoctorRegistration: payload.role === "DOCTOR",
+      return createAccount({
+        name: payload.name,
+        email: input.email,
+        role: payload.role,
+        consentVersion: payload.consentVersion,
+        identity: {
+          provider: "PASSWORD",
+          passwordHash: payload.passwordHash,
+        },
+      }, tx);
     });
 
     return startSession(user, meta);

@@ -23,7 +23,7 @@ export const signAccessToken = (user: { id: string; role: Role }): string =>
   });
 
 // Verify only: checks signature, expiry, issuer and audience. Never jwt.decode().
-export const verifyAccessToken = (token: string): { userId: string; role: Role } => {
+export const verifyAccessToken = (token: string): { userId: string; role: Role; iat?: number } => {
   let payload: string | jwt.JwtPayload;
   try {
     payload = jwt.verify(token, env.JWT_ACCESS_SECRET, {
@@ -38,18 +38,34 @@ export const verifyAccessToken = (token: string): { userId: string; role: Role }
   if (typeof payload === "string" || typeof payload.sub !== "string" || !isRole(payload.role)) {
     throw new AppError("Invalid token", 401);
   }
-  return { userId: payload.sub, role: payload.role };
+  return { userId: payload.sub, role: payload.role, iat: payload.iat };
 };
 
 type AccessTokenClaims = ReturnType<typeof verifyAccessToken>;
-type CurrentAccount = { id: string; role: Role; status: AccountStatus; deletedAt: Date | null } | null;
+type CurrentAccount = {
+  id: string;
+  role: Role;
+  status: AccountStatus;
+  deletedAt: Date | null;
+  authIdentities?: Array<{ updatedAt: Date }>;
+} | null;
 
 export const resolveAccessTokenAccount = async (
   claims: AccessTokenClaims,
   findAccount: (userId: string) => Promise<CurrentAccount> = async (userId) =>
     prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, role: true, status: true, deletedAt: true },
+      select: {
+        id: true,
+        role: true,
+        status: true,
+        deletedAt: true,
+        authIdentities: {
+          where: { provider: "PASSWORD" },
+          select: { updatedAt: true },
+          take: 1,
+        },
+      },
     }),
 ): Promise<AccessTokenClaims> => {
   const account = await findAccount(claims.userId);
@@ -58,6 +74,14 @@ export const resolveAccessTokenAccount = async (
   }
   if (account.status !== AccountStatus.ACTIVE) {
     throw new AppError("Account is not active", 403);
+  }
+
+  if (claims.iat && account.authIdentities?.[0]?.updatedAt) {
+    const passwordChangedAtMs = account.authIdentities[0].updatedAt.getTime();
+    const tokenIssuedAtMs = claims.iat * 1000;
+    if (tokenIssuedAtMs < passwordChangedAtMs - 2000) {
+      throw new AppError("Token invalidated due to password change. Please log in again.", 401);
+    }
   }
 
   return { userId: account.id, role: account.role };

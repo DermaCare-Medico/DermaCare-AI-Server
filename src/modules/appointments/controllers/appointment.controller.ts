@@ -105,6 +105,77 @@ const getAppointmentForAdmin = async (req: Request, res: Response) => {
     });
 };
 
+const requestCancellationController = async (req: Request, res: Response) => {
+    const appointment = await appointmentService.requestCancellation(
+        getUserId(req),
+        req.params.id!,
+        req.body.reason,
+    );
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Cancellation request submitted for clinical review",
+        data: appointment,
+    });
+};
+
+const reviewCancellationController = async (req: Request, res: Response) => {
+    const role = req.auth?.role;
+    if (!role) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
+
+    const appointment = await appointmentService.reviewCancellation(
+        getUserId(req),
+        role,
+        req.params.id!,
+        req.body,
+    );
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Cancellation decision recorded",
+        data: appointment,
+    });
+};
+
+const cancelAppointmentController = async (req: Request, res: Response) => {
+    const role = req.auth?.role;
+    if (!role) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
+
+    const appointment = await appointmentService.cancelAppointment(
+        getUserId(req),
+        role,
+        req.params.id!,
+        req.body.reason,
+    );
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Appointment cancelled successfully",
+        data: appointment,
+    });
+};
+
+const markNoShowController = async (req: Request, res: Response) => {
+    const role = req.auth?.role;
+    if (!role) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
+
+    const appointment = await appointmentService.markNoShow(
+        getUserId(req),
+        role,
+        req.params.id!,
+    );
+
+    return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        statusCode: HTTP_STATUS.OK,
+        message: "Appointment marked as no-show",
+        data: appointment,
+    });
+};
+
 export const appointmentController = {
     createAppointmentController,
     getMyAppointmentsController,
@@ -112,4 +183,8 @@ export const appointmentController = {
     getDoctorAppointmentByIdController,
     listAppointmentsForAdmin,
     getAppointmentForAdmin,
+    requestCancellationController,
+    reviewCancellationController,
+    cancelAppointmentController,
+    markNoShowController,
 };

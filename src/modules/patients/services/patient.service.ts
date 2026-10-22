@@ -8,6 +8,7 @@ import {
 import { UpdatePatientProfilePayload } from "../../../types/patients.types.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
+import { presentDoctorSpecializations } from "../../doctors/doctor-specializations.presenter.js";
 
 const ensureActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -177,8 +178,12 @@ const getMyDashboard = async (userId: string) => {
                                 select: {
                                     id: true,
                                     user: { select: { name: true } },
-                                    specialization: {
-                                        select: { id: true, name: true },
+                                    specializations: {
+                                        select: {
+                                            specialization: {
+                                                select: { id: true, name: true },
+                                            },
+                                        },
                                     },
                                 },
                             },
@@ -231,7 +236,17 @@ const getMyDashboard = async (userId: string) => {
 
     return {
         latestScreening: user.patientProfile.screenings[0] ?? null,
-        upcomingAppointments: user.patientProfile.appointments,
+        upcomingAppointments: user.patientProfile.appointments.map(
+            (appointment) => ({
+                ...appointment,
+                doctor: {
+                    ...appointment.doctor,
+                    ...presentDoctorSpecializations(
+                        appointment.doctor.specializations,
+                    ),
+                },
+            }),
+        ),
         recentOrders: user.patientProfile.orders,
         unreadNotificationCount: user._count.notifications,
     };

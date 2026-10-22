@@ -39,28 +39,45 @@ export async function createDoctorSlot(
 ) {
   const doctor = await getDoctorProfile(userId);
 
-  const overlappingSlot = await prisma.doctorSlot.findFirst({
-    where: {
-      doctorId: doctor.id,
-      startTime: { lt: input.endTime },
-      endTime: { gt: input.startTime },
-      status: { not: SlotStatus.UNAVAILABLE },
-    },
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctor.id}, 0))`;
+    const overlappingSlot = await tx.doctorSlot.findFirst({
+      where: {
+        doctorId: doctor.id,
+        startTime: { lt: input.endTime },
+        endTime: { gt: input.startTime },
+        status: { not: SlotStatus.UNAVAILABLE },
+      },
+      select: { id: true },
+    });
+    if (overlappingSlot) {
+      throw new AppError("This time overlaps with an existing slot", HTTP_STATUS.CONFLICT);
+    }
+    return tx.doctorSlot.create({
+      data: { doctorId: doctor.id, startTime: input.startTime, endTime: input.endTime },
+    });
   });
+}
 
-  if (overlappingSlot) {
-    throw new AppError(
-      "This time overlaps with an existing slot",
-      HTTP_STATUS.CONFLICT,
-    );
-  }
-
-  return prisma.doctorSlot.create({
-    data: {
-      doctorId: doctor.id,
-      startTime: input.startTime,
-      endTime: input.endTime,
+export async function getAvailableDoctorSlots(doctorId: string) {
+  const doctor = await prisma.doctorProfile.findFirst({
+    where: {
+      id: doctorId,
+      approvalStatus: "APPROVED",
+      user: { status: "ACTIVE", deletedAt: null },
     },
+    select: { id: true },
+  });
+  if (!doctor) throw new AppError("Doctor not found", HTTP_STATUS.NOT_FOUND);
+
+  return prisma.doctorSlot.findMany({
+    where: {
+      doctorId,
+      status: SlotStatus.AVAILABLE,
+      startTime: { gt: new Date() },
+    },
+    select: { id: true, startTime: true, endTime: true },
+    orderBy: { startTime: "asc" },
   });
 }
 
@@ -80,36 +97,50 @@ export async function updateDoctorSlot(
 ) {
   const doctor = await getDoctorProfile(userId);
 
-  const slot = await prisma.doctorSlot.findFirst({
-    where: {
-      id: slotId,
-      doctorId: doctor.id,
-    },
-    include: {
-      appointments: {
-        where: {
-          status: {
-            notIn: ["CANCELLED"],
-          },
-        },
-        select: { id: true },
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctor.id}, 0))`;
+    const slot = await tx.doctorSlot.findFirst({
+      where: { id: slotId, doctorId: doctor.id },
+      select: { id: true },
+    });
+    if (!slot) throw new AppError("Slot not found", HTTP_STATUS.NOT_FOUND);
+
+    const updated = await tx.doctorSlot.updateMany({
+      where: {
+        id: slotId,
+        doctorId: doctor.id,
+        appointments: { none: { status: { not: "CANCELLED" } } },
       },
-    },
+      data: { status },
+    });
+    if (updated.count !== 1) {
+      throw new AppError("A slot with an appointment cannot be changed", HTTP_STATUS.CONFLICT);
+    }
+    return tx.doctorSlot.findUniqueOrThrow({ where: { id: slotId } });
   });
+}
 
-  if (!slot) {
-    throw new AppError("Slot not found", HTTP_STATUS.NOT_FOUND);
-  }
+export async function deleteDoctorSlot(userId: string, slotId: string) {
+  const doctor = await getDoctorProfile(userId);
 
-  if (slot.appointments.length > 0) {
-    throw new AppError(
-      "A slot with an appointment cannot be changed",
-      HTTP_STATUS.CONFLICT,
-    );
-  }
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctor.id}, 0))`;
+    const slot = await tx.doctorSlot.findFirst({
+      where: { id: slotId, doctorId: doctor.id },
+      select: { id: true },
+    });
+    if (!slot) throw new AppError("Slot not found", HTTP_STATUS.NOT_FOUND);
 
-  return prisma.doctorSlot.update({
-    where: { id: slot.id },
-    data: { status },
+    const deleted = await tx.doctorSlot.deleteMany({
+      where: {
+        id: slotId,
+        doctorId: doctor.id,
+        appointments: { none: { status: { not: "CANCELLED" } } },
+      },
+    });
+    if (deleted.count !== 1) {
+      throw new AppError("A slot with an active appointment cannot be deleted", HTTP_STATUS.CONFLICT);
+    }
+    return { success: true, message: "Slot deleted successfully" };
   });
 }

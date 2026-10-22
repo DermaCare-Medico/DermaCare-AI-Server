@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 import { paymentController } from "./controllers/payment.controller.js";
+import { paymentVerificationController } from "./controllers/payment-verification.controller.js";
 import {
     validateAppointmentPayment,
     validateAppointmentPaymentId,
@@ -23,6 +24,11 @@ paymentRouter.get(
     asyncHandler(paymentController.getAppointmentPaymentController),
 );
 paymentRouter.post(
+    "/appointments/:id/payments/checkout",
+    validateAppointmentPayment,
+    asyncHandler(paymentVerificationController.createAppointmentCheckout),
+);
+paymentRouter.post(
     "/orders/:id/payments",
     validateOrderPayment,
     asyncHandler(paymentController.payForOrderController),
@@ -31,6 +37,11 @@ paymentRouter.get(
     "/orders/:id/payments",
     validateOrderPaymentId,
     asyncHandler(paymentController.getOrderPaymentController),
+);
+paymentRouter.post(
+    "/orders/:id/payments/checkout",
+    validateOrderPaymentId,
+    asyncHandler(paymentVerificationController.createOrderCheckout),
 );
 
 export default paymentRouter;

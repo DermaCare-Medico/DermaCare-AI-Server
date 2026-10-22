@@ -1,11 +1,14 @@
 import type { Request, Response } from "express";
 import {
   createDoctorSlot,
+  deleteDoctorSlot,
+  getAvailableDoctorSlots,
   getMyDoctorSlots,
   updateDoctorSlot,
 } from "../services/doctor-slot.service.js";
 import {
   createDoctorSlotSchema,
+  doctorIdParamsSchema,
   doctorSlotParamsSchema,
   updateDoctorSlotSchema,
 } from "../doctors.validation.js";
@@ -20,6 +23,15 @@ function getUserId(req: Request) {
   }
 
   return userId;
+}
+
+export async function getAvailableSlotsController(
+  req: Request,
+  res: Response,
+) {
+  const { doctorId } = doctorIdParamsSchema.parse(req.params);
+  const slots = await getAvailableDoctorSlots(doctorId);
+  res.status(HTTP_STATUS.OK).json({ success: true, data: slots });
 }
 
 export async function createSlotController(
@@ -65,5 +77,22 @@ export async function updateSlotController(
     success: true,
     message: "Slot updated successfully",
     data: slot,
+  });
+}
+
+export async function deleteSlotController(
+  req: Request,
+  res: Response,
+) {
+  const { slotId } = doctorSlotParamsSchema.parse(req.params);
+
+  const result = await deleteDoctorSlot(
+    getUserId(req),
+    slotId,
+  );
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: result.message,
   });
 }
