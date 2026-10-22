@@ -7,7 +7,7 @@ import { errorHandler } from "./shared/errors/errorHandler.js";
 import { notFound } from "./shared/errors/notFound.js";
 import apiRouter from "./routes/index.js";
 import docsRouter from "./docs/docs.routes.js";
-import { asyncHandler } from "./middlewares/asyncHandler.js";
+import { asyncHandler } from "./middlewares/asyncHandler.middleware.js";
 import { paymentWebhookController } from "./modules/payments/controllers/payment-webhook.controller.js";
 
 const app = express();
