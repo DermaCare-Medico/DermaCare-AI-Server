@@ -2,6 +2,7 @@ import Stripe from "stripe";
 
 import {
   Prisma,
+  PayoutStatus,
   RefundStatus,
   TransactionStatus,
 } from "../../../generated/prisma/client.js";
@@ -24,6 +25,40 @@ export function refundStateForStripeStatus(status: Stripe.Refund["status"] | nul
 
 export const stripeRefundIdempotencyKey = (paymentId: string) => `payment-refund-${paymentId}`;
 
+export async function reconcileRefundedAppointmentPayout(
+  tx: Prisma.TransactionClient,
+  appointmentId: string,
+) {
+  const item = await tx.doctorPayoutItem.findUnique({
+    where: { appointmentId },
+    select: {
+      id: true,
+      consultationAmount: true,
+      platformFee: true,
+      doctorAmount: true,
+      payout: { select: { id: true, status: true, transactionReference: true } },
+    },
+  });
+  if (!item || item.payout.status === PayoutStatus.PAID) return null;
+  if (item.payout.status !== PayoutStatus.PENDING && item.payout.status !== PayoutStatus.PROCESSING) {
+    return null;
+  }
+
+  const claimed = await tx.doctorPayout.updateMany({
+    where: { id: item.payout.id, status: item.payout.status },
+    data: {
+      totalConsultations: { decrement: 1 },
+      grossAmount: { decrement: item.consultationAmount },
+      platformFee: { decrement: item.platformFee },
+      netAmount: { decrement: item.doctorAmount },
+      ...(item.payout.status === PayoutStatus.PROCESSING && { status: PayoutStatus.FAILED }),
+    },
+  });
+  if (claimed.count !== 1) return null;
+  await tx.doctorPayoutItem.delete({ where: { id: item.id } });
+  return item.payout.status === PayoutStatus.PROCESSING ? item.payout.transactionReference : null;
+}
+
 export async function stagePaymentRefunds(
   tx: Prisma.TransactionClient,
   target: { appointmentId: string } | { orderId: string } | { id: string },
@@ -33,6 +68,7 @@ export async function stagePaymentRefunds(
     select: { id: true, provider: true, refundStatus: true },
   });
   const stripePaymentIds: string[] = [];
+  let consultationRefunded = false;
   for (const payment of payments) {
     if (payment.provider === "STRIPE") {
       if (payment.refundStatus !== RefundStatus.SUCCEEDED) {
@@ -52,6 +88,7 @@ export async function stagePaymentRefunds(
           refundError: null,
         },
       });
+      consultationRefunded = true;
     } else {
       await tx.paymentTransaction.update({
         where: { id: payment.id },
@@ -61,6 +98,9 @@ export async function stagePaymentRefunds(
         },
       });
     }
+  }
+  if (consultationRefunded && "appointmentId" in target) {
+    await reconcileRefundedAppointmentPayout(tx, target.appointmentId);
   }
   return stripePaymentIds;
 }
@@ -89,19 +129,39 @@ async function persistRefund(paymentId: string, refund: Stripe.Refund) {
   const paymentIntentId = typeof refund.payment_intent === "string"
     ? refund.payment_intent
     : refund.payment_intent?.id;
-  await prisma.paymentTransaction.updateMany({
-    where: { id: paymentId, provider: "STRIPE", status: TransactionStatus.PAID },
-    data: {
-      ...(paymentIntentId && { stripePaymentIntentId: paymentIntentId }),
-      stripeRefundId: refund.id,
-      refundStatus,
-      refundError: refund.failure_reason ?? null,
-      ...(refundStatus === RefundStatus.SUCCEEDED && {
-        status: TransactionStatus.REFUNDED,
-        refundedAt: new Date(),
-      }),
-    },
-  });
+  const checkoutToExpire = await prisma.$transaction(async (tx) => {
+    const payment = await tx.paymentTransaction.findUnique({
+      where: { id: paymentId },
+      select: { appointmentId: true },
+    });
+    const updated = await tx.paymentTransaction.updateMany({
+      where: { id: paymentId, provider: "STRIPE", status: TransactionStatus.PAID },
+      data: {
+        ...(paymentIntentId && { stripePaymentIntentId: paymentIntentId }),
+        stripeRefundId: refund.id,
+        refundStatus,
+        refundError: refund.failure_reason ?? null,
+        ...(refundStatus === RefundStatus.SUCCEEDED && {
+          status: TransactionStatus.REFUNDED,
+          refundedAt: new Date(),
+        }),
+      },
+    });
+    if (updated.count !== 1 || refundStatus !== RefundStatus.SUCCEEDED || !payment?.appointmentId) return null;
+    return reconcileRefundedAppointmentPayout(tx, payment.appointmentId);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+  if (checkoutToExpire) {
+    try {
+      await stripe().checkout.sessions.expire(checkoutToExpire);
+      await prisma.doctorPayout.updateMany({
+        where: { status: PayoutStatus.FAILED, transactionReference: checkoutToExpire },
+        data: { status: PayoutStatus.PENDING },
+      });
+    } catch {
+      // FAILED intentionally blocks payment until the stale Checkout Session can no longer complete.
+    }
+  }
 }
 
 export async function requestStripeRefund(paymentId: string) {

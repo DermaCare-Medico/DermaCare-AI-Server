@@ -11,6 +11,8 @@ import {
   calculateConsultationEarnings,
   getMonthDateRange,
   isAppointmentEligibleForEarnings,
+  isCommittedPayoutStatus,
+  slotStartInEarningsRange,
 } from "./doctor-earnings.rules.js";
 
 test("calculateConsultationEarnings correctly computes 15% default platform commission", () => {
@@ -19,6 +21,20 @@ test("calculateConsultationEarnings correctly computes 15% default platform comm
   assert.equal(result.platformFee.toString(), "15");
   assert.equal(result.doctorAmount.toString(), "85");
   assert.equal(result.platformFee.add(result.doctorAmount).toString(), "100");
+});
+
+test("PROCESSING and PENDING payouts are committed allocations", () => {
+  assert.equal(isCommittedPayoutStatus("PENDING"), true);
+  assert.equal(isCommittedPayoutStatus("PROCESSING"), true);
+  assert.equal(isCommittedPayoutStatus("PAID"), false);
+  assert.equal(isCommittedPayoutStatus("FAILED"), false);
+});
+
+test("monthly earnings use only appointment slot start time at UTC boundaries", () => {
+  const range = getMonthDateRange(2026, 10);
+  const where = slotStartInEarningsRange(range);
+  assert.deepEqual(where, { slot: { startTime: { gte: range.periodStart, lte: range.periodEnd } } });
+  assert.equal("createdAt" in where, false);
 });
 
 test("calculateConsultationEarnings handles fractional numbers and rounds half up", () => {

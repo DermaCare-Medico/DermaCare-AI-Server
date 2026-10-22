@@ -15,6 +15,7 @@ import {
     calculateConsultationEarnings,
     getEligiblePayment,
     getMonthDateRange,
+    slotStartInEarningsRange,
 } from "../../doctors/services/doctor-earnings.rules.js";
 import Stripe from "stripe";
 import { env } from "../../../config/env.js";
@@ -26,6 +27,10 @@ const stripe = () => {
     stripeClient ??= new Stripe(env.STRIPE_SECRET_KEY);
     return stripeClient;
 };
+
+export const isRetryablePayoutGenerationConflict = (error: unknown) =>
+    error instanceof Prisma.PrismaClientKnownRequestError
+    && (error.code === "P2002" || error.code === "P2034");
 
 const payoutSelect = {
     id: true,
@@ -205,12 +210,7 @@ const getMonthlyEarningsSummary = async (
                 where: {
                     doctorId: doc.id,
                     status: AppointmentStatus.COMPLETED,
-                    ...(dateRange && {
-                        OR: [
-                            { slot: { startTime: { gte: dateRange.periodStart, lte: dateRange.periodEnd } } },
-                            { createdAt: { gte: dateRange.periodStart, lte: dateRange.periodEnd } },
-                        ],
-                    }),
+                    ...(dateRange && slotStartInEarningsRange(dateRange)),
                 },
                 select: {
                     id: true,
@@ -331,12 +331,7 @@ const getDoctorPayable = async (
             doctorId,
             status: AppointmentStatus.COMPLETED,
             payoutItem: null,
-            ...(dateRange && {
-                OR: [
-                    { slot: { startTime: { gte: dateRange.periodStart, lte: dateRange.periodEnd } } },
-                    { createdAt: { gte: dateRange.periodStart, lte: dateRange.periodEnd } },
-                ],
-            }),
+            ...(dateRange && slotStartInEarningsRange(dateRange)),
         },
         include: {
             patient: { select: { id: true, user: { select: { name: true } } } },
@@ -453,10 +448,7 @@ const generateMonthlyPayout = async (
             doctorId,
             status: AppointmentStatus.COMPLETED,
             payoutItem: null,
-            OR: [
-                { slot: { startTime: { gte: periodStart, lte: periodEnd } } },
-                { createdAt: { gte: periodStart, lte: periodEnd } },
-            ],
+            ...slotStartInEarningsRange({ periodStart, periodEnd }),
         },
         include: {
             payments: {
@@ -472,7 +464,7 @@ const generateMonthlyPayout = async (
         throw new AppError("No eligible completed paid consultations found for this period", 400);
     }
 
-    return prisma.$transaction(async (tx) => {
+    const createPayout = () => prisma.$transaction(async (tx) => {
         // Concurrency guard
         const recheck = await tx.doctorPayout.findUnique({
             where: {
@@ -555,7 +547,26 @@ const generateMonthlyPayout = async (
             message: "Doctor payout generated successfully",
             payout: created,
         };
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+            return await createPayout();
+        } catch (error) {
+            if (!isRetryablePayoutGenerationConflict(error)) throw error;
+            const concurrent = await prisma.doctorPayout.findUnique({
+                where: { doctorId_periodStart_periodEnd: { doctorId, periodStart: periodStartDateOnly, periodEnd: periodEndDateOnly } },
+                select: payoutSelect,
+            });
+            if (concurrent) return {
+                isIdempotent: true,
+                message: "Doctor payout for this period already exists",
+                payout: concurrent,
+            };
+            if (attempt === 2) throw error;
+        }
+    }
+    throw new AppError("Doctor payout generation could not be completed", 409);
 };
 
 export const doctorPayoutAdminService = {

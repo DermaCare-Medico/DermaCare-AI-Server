@@ -6,6 +6,7 @@ import {
   RefundStatus,
   TransactionPurpose,
   TransactionStatus,
+  PayoutStatus,
 } from "../../../generated/prisma/client.js";
 
 export const DEFAULT_PLATFORM_FEE_PERCENT = 15;
@@ -56,6 +57,10 @@ export function getMonthDateRange(year: number, month: number) {
   };
 }
 
+export const slotStartInEarningsRange = (range: { periodStart: Date; periodEnd: Date }) => ({
+  slot: { startTime: { gte: range.periodStart, lte: range.periodEnd } },
+});
+
 export interface PaymentRecord {
   purpose: TransactionPurpose;
   status: TransactionStatus;
@@ -93,3 +98,6 @@ export function getEligiblePayment(appointment: AppointmentRecordForEarnings): P
 export function isAppointmentEligibleForEarnings(appointment: AppointmentRecordForEarnings): boolean {
   return getEligiblePayment(appointment) !== null;
 }
+
+export const isCommittedPayoutStatus = (status: PayoutStatus) =>
+  status === PayoutStatus.PENDING || status === PayoutStatus.PROCESSING;

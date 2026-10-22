@@ -18,6 +18,7 @@ import {
   calculateConsultationEarnings,
   getEligiblePayment,
   getMonthDateRange,
+  isCommittedPayoutStatus,
 } from "./doctor-earnings.rules.js";
 
 async function getApprovedDoctor(userId: string) {
@@ -111,7 +112,7 @@ export async function getDoctorEarningsSummary(userId: string) {
   for (const p of payouts) {
     if (p.status === PayoutStatus.PAID) {
       totalPaid = totalPaid.add(p.netAmount);
-    } else if (p.status === PayoutStatus.PENDING) {
+    } else if (isCommittedPayoutStatus(p.status)) {
       pendingPayout = pendingPayout.add(p.netAmount);
     }
   }
@@ -152,10 +153,7 @@ export async function getDoctorEarningsHistory(
       doctorId: doctor.id,
       status: AppointmentStatus.COMPLETED,
       ...(dateFilter && {
-        OR: [
-          { slot: { startTime: dateFilter } },
-          { createdAt: dateFilter },
-        ],
+        slot: { startTime: dateFilter },
       }),
     },
     include: {

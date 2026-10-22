@@ -3,11 +3,13 @@ import test from "node:test";
 
 import {
   Prisma,
+  PayoutStatus,
   RefundStatus,
   TransactionStatus,
 } from "../../../generated/prisma/client.js";
 import {
   refundStateForStripeStatus,
+  reconcileRefundedAppointmentPayout,
   stagePaymentRefunds,
   stripeRefundIdempotencyKey,
 } from "./stripe-refund.service.js";
@@ -40,6 +42,7 @@ test("staging keeps Stripe money PAID and only immediately refunds demo payments
         return args;
       },
     },
+    doctorPayoutItem: { findUnique: async () => null },
   } as unknown as Prisma.TransactionClient;
 
   const ids = await stagePaymentRefunds(tx, { appointmentId: "appointment-id" });
@@ -51,6 +54,57 @@ test("staging keeps Stripe money PAID and only immediately refunds demo payments
   assert.equal(updates[2]!.data.status, undefined);
   assert.equal(updates[2]!.data.refundStatus, RefundStatus.FAILED);
   assert.match(String(updates[2]!.data.refundError), /not supported/i);
+});
+
+test("post-generation refund removes an unpaid ledger item and recalculates its payout", async () => {
+  const payoutUpdates: any[] = [];
+  const deleted: string[] = [];
+  const tx = {
+    doctorPayoutItem: {
+      findUnique: async () => ({
+        id: "item-1",
+        consultationAmount: new Prisma.Decimal("100"),
+        platformFee: new Prisma.Decimal("15"),
+        doctorAmount: new Prisma.Decimal("85"),
+        payout: { id: "payout-1", status: PayoutStatus.PENDING, transactionReference: null },
+      }),
+      delete: async ({ where }: any) => deleted.push(where.id),
+    },
+    doctorPayout: {
+      updateMany: async (args: any) => { payoutUpdates.push(args); return { count: 1 }; },
+    },
+  } as unknown as Prisma.TransactionClient;
+  assert.equal(await reconcileRefundedAppointmentPayout(tx, "appointment-1"), null);
+  assert.deepEqual(deleted, ["item-1"]);
+  assert.equal(payoutUpdates[0].data.totalConsultations.decrement, 1);
+  assert.equal(payoutUpdates[0].data.netAmount.decrement.toString(), "85");
+});
+
+test("post-generation refund preserves an already-paid payout as immutable history", async () => {
+  let mutated = false;
+  const tx = {
+    doctorPayoutItem: { findUnique: async () => ({
+      id: "item-1", consultationAmount: new Prisma.Decimal(100), platformFee: new Prisma.Decimal(15),
+      doctorAmount: new Prisma.Decimal(85), payout: { id: "payout-1", status: PayoutStatus.PAID, transactionReference: "cs_paid" },
+    }), delete: async () => { mutated = true; } },
+    doctorPayout: { updateMany: async () => { mutated = true; return { count: 1 }; } },
+  } as unknown as Prisma.TransactionClient;
+  assert.equal(await reconcileRefundedAppointmentPayout(tx, "appointment-1"), null);
+  assert.equal(mutated, false);
+});
+
+test("refund blocks an in-flight payout and returns its Checkout Session for expiry", async () => {
+  const tx = {
+    doctorPayoutItem: { findUnique: async () => ({
+      id: "item-1", consultationAmount: new Prisma.Decimal(100), platformFee: new Prisma.Decimal(15),
+      doctorAmount: new Prisma.Decimal(85), payout: { id: "payout-1", status: PayoutStatus.PROCESSING, transactionReference: "cs_open" },
+    }), delete: async () => ({}) },
+    doctorPayout: { updateMany: async (args: any) => {
+      assert.equal(args.data.status, PayoutStatus.FAILED);
+      return { count: 1 };
+    } },
+  } as unknown as Prisma.TransactionClient;
+  assert.equal(await reconcileRefundedAppointmentPayout(tx, "appointment-1"), "cs_open");
 });
 
 test("duplicate refund requests use the same Stripe idempotency key", () => {
