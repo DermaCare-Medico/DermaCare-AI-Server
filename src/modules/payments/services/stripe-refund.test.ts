@@ -12,6 +12,7 @@ import {
   reconcileRefundedAppointmentPayout,
   stagePaymentRefunds,
   stripeRefundIdempotencyKey,
+  summarizeRefundRequests,
 } from "./stripe-refund.service.js";
 
 test("succeeded Stripe refund is the only successful refund state", () => {
@@ -112,4 +113,24 @@ test("duplicate refund requests use the same Stripe idempotency key", () => {
     stripeRefundIdempotencyKey("payment-id"),
     stripeRefundIdempotencyKey("payment-id"),
   );
+});
+
+test("cancellation refund reporting distinguishes processing, verified completion and failure", () => {
+  assert.deepEqual(summarizeRefundRequests([], [], []), {
+    status: "NOT_REQUIRED", failedPaymentIds: [],
+  });
+  assert.equal(summarizeRefundRequests(["payment-1"], [], [RefundStatus.PENDING]).status, "PROCESSING");
+  assert.equal(summarizeRefundRequests(["payment-1"], [], [RefundStatus.SUCCEEDED]).status, "COMPLETED");
+  assert.deepEqual(summarizeRefundRequests(["payment-1"], ["payment-1"], [RefundStatus.FAILED]), {
+    status: "FAILED", failedPaymentIds: ["payment-1"],
+  });
+});
+
+test("a pending Stripe refund is never reported as completed", () => {
+  const result = summarizeRefundRequests(
+    ["payment-1", "payment-2"],
+    [],
+    [RefundStatus.SUCCEEDED, RefundStatus.PENDING],
+  );
+  assert.equal(result.status, "PROCESSING");
 });

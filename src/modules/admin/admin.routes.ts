@@ -10,6 +10,10 @@ import { orderController } from "../orders/controllers/order.controller.js";
 import { medicineController } from "../stores/controllers/medicine.controller.js";
 import { appointmentController } from "../appointments/controllers/appointment.controller.js";
 import {
+    validateCancellationDecision,
+    validateDirectCancel,
+} from "../appointments/appointments.validation.js";
+import {
     validateAdminOrderList,
     validateAdminAppointmentId,
     validateAdminAppointmentList,
@@ -166,6 +170,21 @@ adminRouter.get(
     "/appointments/:id",
     validateAdminAppointmentId,
     asyncHandler(appointmentController.getAppointmentForAdmin),
+);
+adminRouter.patch(
+    "/appointments/:id/cancellation",
+    validateCancellationDecision,
+    asyncHandler(appointmentController.reviewCancellationController),
+);
+adminRouter.post(
+    "/appointments/:id/cancel",
+    validateDirectCancel,
+    asyncHandler(appointmentController.cancelAppointmentController),
+);
+adminRouter.patch(
+    "/appointments/:id/no-show",
+    validateAdminAppointmentId,
+    asyncHandler(appointmentController.markNoShowController),
 );
 adminRouter.post(
     "/appointments/:id/meeting/retry",

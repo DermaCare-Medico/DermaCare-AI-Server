@@ -222,6 +222,39 @@ export async function requestStripeRefunds(paymentIds: string[]) {
   return results.filter((result) => !result.succeeded).map((result) => result.paymentId);
 }
 
+export type RefundRequestResult = {
+  status: "NOT_REQUIRED" | "PROCESSING" | "COMPLETED" | "FAILED";
+  failedPaymentIds: string[];
+};
+
+export const summarizeRefundRequests = (
+  paymentIds: string[],
+  failedPaymentIds: string[],
+  statuses: Array<RefundStatus | null>,
+): RefundRequestResult => {
+  if (paymentIds.length === 0) return { status: "NOT_REQUIRED", failedPaymentIds: [] };
+  if (failedPaymentIds.length > 0 || statuses.includes(RefundStatus.FAILED)) {
+    return { status: "FAILED", failedPaymentIds };
+  }
+  if (statuses.length === paymentIds.length && statuses.every((status) => status === RefundStatus.SUCCEEDED)) {
+    return { status: "COMPLETED", failedPaymentIds: [] };
+  }
+  return { status: "PROCESSING", failedPaymentIds: [] };
+};
+
+export async function requestStripeRefundsWithResult(paymentIds: string[]): Promise<RefundRequestResult> {
+  const failedPaymentIds = await requestStripeRefunds(paymentIds);
+  const payments = paymentIds.length === 0 ? [] : await prisma.paymentTransaction.findMany({
+    where: { id: { in: paymentIds } },
+    select: { refundStatus: true },
+  });
+  return summarizeRefundRequests(
+    paymentIds,
+    failedPaymentIds,
+    payments.map(({ refundStatus }) => refundStatus),
+  );
+}
+
 export async function reconcileStripeRefund(refund: Stripe.Refund) {
   const paymentId = refund.metadata?.paymentTransactionId;
   const payment = await prisma.paymentTransaction.findFirst({

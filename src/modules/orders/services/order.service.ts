@@ -26,7 +26,7 @@ import {
     createNotification,
     createNotificationIfEligible,
 } from "../../notifications/services/notification.service.js";
-import { requestStripeRefunds, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
+import { requestStripeRefundsWithResult, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
 import { expireStripeCheckoutSessions } from "../../payments/services/payment-verification.service.js";
 
 const getActivePatient = async (userId: string) => {
@@ -461,8 +461,8 @@ const updateOrderStatusForAdmin = async (
         });
         return { order, refundPaymentIds };
     });
-    await requestStripeRefunds(result.refundPaymentIds);
-    return result.order;
+    const refund = await requestStripeRefundsWithResult(result.refundPaymentIds);
+    return { ...result.order, refund };
 };
 
 const cleanupExpiredUnpaidOrders = async (now = new Date(), batchSize = 100) => {

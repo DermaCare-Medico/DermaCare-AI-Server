@@ -20,7 +20,7 @@ import type { AdminAppointmentListQuery } from "../../admin/admin.validation.js"
 import { requireActiveAdmin } from "../../admin/services/admin.service.js";
 import { canExposeMeeting } from "../../../integrations/google-calendar/meeting-access.rules.js";
 import { presentDoctorSpecializations } from "../../doctors/doctor-specializations.presenter.js";
-import { requestStripeRefunds, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
+import { requestStripeRefundsWithResult, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
 import { expireStripeCheckoutSessions } from "../../payments/services/payment-verification.service.js";
 
 const httpError = (statusCode: number, message: string) => new AppError(message, statusCode);
@@ -575,8 +575,8 @@ const reviewCancellation = async (
             return { data: presentAppointment(updated, false), refundPaymentIds: [] as string[] };
         }
     });
-    await requestStripeRefunds(result.refundPaymentIds);
-    return result.data;
+    const refund = await requestStripeRefundsWithResult(result.refundPaymentIds);
+    return { ...result.data, refund };
 };
 
 const cancelAppointment = async (
@@ -651,8 +651,8 @@ const cancelAppointment = async (
 
         return { data: presentAppointment(updated, false), refundPaymentIds };
     });
-    await requestStripeRefunds(result.refundPaymentIds);
-    return result.data;
+    const refund = await requestStripeRefundsWithResult(result.refundPaymentIds);
+    return { ...result.data, refund };
 };
 
 const markNoShow = async (
