@@ -6,7 +6,7 @@ import {
   doctorApplicationSchema,
   doctorProfileUpdateSchema,
 } from "./doctors.validation.js";
-import { doctorDocumentBelongsToUser } from "./services/doctor-profile.service.js";
+import { doctorDocumentBelongsToUser, selectOwnedDoctorDocument } from "./services/doctor-profile.service.js";
 
 test("doctor history pagination is bounded and status is validated", () => {
   assert.deepEqual(doctorAppointmentHistoryQuerySchema.parse({}), { page: 1, limit: 10 });
@@ -42,6 +42,25 @@ test("Doctor document references are bound to their authenticated owner", () => 
     "DermaCare-AI/doctor-documents/user-2/license-front",
     "user-1",
   ), false);
+  assert.equal(doctorDocumentBelongsToUser(
+    "DermaCare-AI/doctor-documents/user-1/../user-2/license-front",
+    "user-1",
+  ), false);
+  assert.equal(doctorApplicationSchema.safeParse({
+    licenseNumber: "LIC-123",
+    qualifications: ["MBBS"],
+    experienceYears: 5,
+    consultationFee: 1000,
+    specializationIds: ["123e4567-e89b-42d3-a456-426614174000"],
+    documentReferences: ["DermaCare-AI/doctor-documents/user-1/../secret"],
+  }).success, false);
+  assert.equal(selectOwnedDoctorDocument(
+    ["DermaCare-AI/doctor-documents/user-1/license-front"], 0, "user-1",
+  ), "DermaCare-AI/doctor-documents/user-1/license-front");
+  assert.throws(() => selectOwnedDoctorDocument(
+    ["DermaCare-AI/doctor-documents/user-2/license-front"], 0, "user-1",
+  ));
+  assert.throws(() => selectOwnedDoctorDocument([], 0, "user-1"));
 });
 
 test("doctor profile updates reject empty or credential fields", () => {

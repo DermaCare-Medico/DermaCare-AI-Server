@@ -22,6 +22,7 @@ import {
     validateAdminOrderStatus,
     validateAdminDoctorList,
     validateAdminDoctorId,
+    validateAdminDoctorDocument,
     validateAdminDoctorApproval,
     validateAdminDoctorApprovalList,
     validateAdminDoctorRejection,
@@ -115,6 +116,11 @@ adminRouter.get(
     "/doctors",
     validateAdminDoctorList,
     asyncHandler(userManagementController.listDoctors),
+);
+adminRouter.get(
+    "/doctors/:id/documents/:documentIndex",
+    validateAdminDoctorDocument,
+    asyncHandler(doctorVerificationController.downloadDoctorDocument),
 );
 adminRouter.get(
     "/doctors/:id",

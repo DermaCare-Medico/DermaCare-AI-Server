@@ -55,6 +55,13 @@ router.post(
 );
 
 router.get(
+  "/me/application-documents/:documentIndex",
+  authenticate,
+  authorize(Role.USER, Role.PATIENT, Role.DOCTOR),
+  doctorController.downloadApplicationDocument,
+);
+
+router.get(
   "/me/profile",
   authenticate,
   authorize(Role.USER, Role.PATIENT, Role.DOCTOR),

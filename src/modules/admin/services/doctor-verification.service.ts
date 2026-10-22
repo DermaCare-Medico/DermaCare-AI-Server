@@ -9,6 +9,8 @@ import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { requireActiveAdmin } from "./admin.service.js";
 import { createNotification } from "../../notifications/services/notification.service.js";
+import { downloadPrivateImage } from "../../../shared/services/cloudinary/cloudinary.service.js";
+import { selectOwnedDoctorDocument } from "../../doctors/services/doctor-profile.service.js";
 
 const doctorDetailsSelect = {
     id: true,
@@ -82,6 +84,24 @@ const getDoctor = async (adminUserId: string, doctorId: string) => {
     });
     if (!doctor) throw new AppError("Doctor not found", 404);
     return doctor;
+};
+
+const downloadDoctorDocument = async (
+    adminUserId: string,
+    doctorId: string,
+    documentIndex: number,
+) => {
+    await requireActiveAdmin(adminUserId);
+    const doctor = await prisma.doctorProfile.findUnique({
+        where: { id: doctorId },
+        select: { userId: true, documentReferences: true },
+    });
+    if (!doctor) throw new AppError("Doctor not found", 404);
+    return downloadPrivateImage(selectOwnedDoctorDocument(
+        doctor.documentReferences,
+        documentIndex,
+        doctor.userId,
+    ));
 };
 
 const listPendingApprovals = async (adminUserId: string, page: number, limit: number) => {
@@ -221,7 +241,6 @@ const rejectDoctor = async (adminUserId: string, doctorId: string, reason: strin
                 entityId: doctorId,
                 before: { approvalStatus: DoctorApprovalStatus.PENDING },
                 after: { approvalStatus: DoctorApprovalStatus.REJECTED },
-                metadata: { reason },
             },
         });
 
@@ -253,6 +272,7 @@ const rejectDoctor = async (adminUserId: string, doctorId: string, reason: strin
 
 export const doctorVerificationService = {
     getDoctor,
+    downloadDoctorDocument,
     listPendingApprovals,
     approveDoctor,
     rejectDoctor,

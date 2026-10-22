@@ -19,3 +19,8 @@ test("Admin router exposes appointment cancellation review, direct cancellation 
     assert.ok(routes.some((route: any) => route.method === expected.method && route.path === expected.path));
   }
 });
+
+test("Admin router exposes doctor document streaming by opaque index", () => {
+  assert.ok(routes.some((route: any) =>
+    route.method === "GET" && route.path === "/doctors/:id/documents/:documentIndex"));
+});

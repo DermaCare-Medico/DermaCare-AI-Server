@@ -9,8 +9,12 @@ export const doctorApplicationSchema = z.object({
   bio: z.string().trim().max(2000).optional(),
   specializationIds: z.array(z.string().uuid()).min(1).max(20),
   documentReferences: z.array(
-    z.string().trim().regex(/^DermaCare-AI\/doctor-documents\/[A-Za-z0-9_\-/.]+$/),
+    z.string().trim().regex(/^DermaCare-AI\/doctor-documents\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)+$/),
   ).min(1).max(10),
+}).strict();
+
+export const doctorDocumentIndexParamsSchema = z.object({
+  documentIndex: z.coerce.number().int().min(0),
 }).strict();
 
 export const doctorProfileUpdateSchema = z.object({

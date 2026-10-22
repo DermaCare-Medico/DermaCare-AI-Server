@@ -24,6 +24,9 @@ export function refundStateForStripeStatus(status: Stripe.Refund["status"] | nul
 }
 
 export const stripeRefundIdempotencyKey = (paymentId: string) => `payment-refund-${paymentId}`;
+export const refundFailureAuditMetadata = () => ({
+  failureCode: "STRIPE_REFUND_REQUEST_FAILED",
+} as const);
 
 export async function reconcileRefundedAppointmentPayout(
   tx: Prisma.TransactionClient,
@@ -132,7 +135,6 @@ export async function stagePaymentRefunds(
           entityId: payment.id,
           before: { refundStatus: payment.refundStatus },
           after: { refundStatus: RefundStatus.FAILED },
-          metadata: { provider: payment.provider },
         },
       });
     }
@@ -207,7 +209,6 @@ async function persistRefund(paymentId: string, refund: Stripe.Refund) {
           before: { refundStatus: payment.refundStatus },
           after: { refundStatus, paymentStatus: refundStatus === RefundStatus.SUCCEEDED
             ? TransactionStatus.REFUNDED : TransactionStatus.PAID },
-          metadata: { stripeRefundId: refund.id },
         },
       });
     }
@@ -288,7 +289,7 @@ export async function requestStripeRefund(paymentId: string) {
             entityId: payment.id,
             before: { refundStatus: current?.refundStatus ?? null },
             after: { refundStatus: RefundStatus.FAILED },
-            metadata: { error: message },
+            metadata: refundFailureAuditMetadata(),
           },
         });
       }

@@ -23,6 +23,21 @@ const getDoctor = async (req: Request, res: Response) => {
     });
 };
 
+const downloadDoctorDocument = async (req: Request, res: Response) => {
+    const documentIndex = Number(req.params.documentIndex);
+    const document = await doctorVerificationService.downloadDoctorDocument(
+        getAdminUserId(req),
+        req.params.id!,
+        documentIndex,
+    );
+    res.set({
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="doctor-document-${documentIndex + 1}"`,
+        "Cache-Control": "private, no-store",
+    });
+    return res.status(HTTP_STATUS.OK).send(document);
+};
+
 const listPendingApprovals = async (req: Request, res: Response) => {
     const result = await doctorVerificationService.listPendingApprovals(
         getAdminUserId(req),
@@ -67,6 +82,7 @@ const rejectDoctor = async (req: Request, res: Response) => {
 
 export const doctorVerificationController = {
     getDoctor,
+    downloadDoctorDocument,
     listPendingApprovals,
     approveDoctor,
     rejectDoctor,

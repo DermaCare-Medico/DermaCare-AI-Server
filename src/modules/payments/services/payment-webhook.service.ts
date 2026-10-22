@@ -116,8 +116,7 @@ export async function completeDoctorPayout(session: Stripe.Checkout.Session) {
         entityType: "DoctorPayout",
         entityId: payout.id,
         before: { status: PayoutStatus.PROCESSING },
-        after: { status: PayoutStatus.PAID, paidAt, checkoutSessionId: session.id, paymentIntentId },
-        metadata: { netAmount: payout.netAmount.toString(), currency: "BDT" },
+        after: { status: PayoutStatus.PAID, paidAt },
       },
     });
     await createNotificationIfEligible({
@@ -276,12 +275,6 @@ async function completeAppointment(session: Stripe.Checkout.Session, paymentId: 
         entityId: payment.id,
         before: { status: payment.status },
         after: { status: TransactionStatus.PAID, paidAt: true },
-        metadata: {
-          purpose: TransactionPurpose.APPOINTMENT,
-          appointmentId: payment.appointment.id,
-          amount: payment.amount.toString(),
-          currency: payment.currency,
-        },
       },
     });
     return { completed: true, refundPaymentIds: [] as string[] };
@@ -371,12 +364,6 @@ async function completeOrder(session: Stripe.Checkout.Session, paymentId: string
         entityId: payment.id,
         before: { status: payment.status },
         after: { status: TransactionStatus.PAID, paidAt: true },
-        metadata: {
-          purpose: TransactionPurpose.MEDICINE_ORDER,
-          orderId: payment.order.id,
-          amount: payment.amount.toString(),
-          currency: payment.currency,
-        },
       },
     });
     return { refundPaymentIds: [] as string[] };

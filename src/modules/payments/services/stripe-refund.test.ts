@@ -12,6 +12,7 @@ import {
   reconcileRefundedAppointmentPayout,
   stagePaymentRefunds,
   stripeRefundIdempotencyKey,
+  refundFailureAuditMetadata,
   summarizeRefundRequests,
 } from "./stripe-refund.service.js";
 
@@ -114,6 +115,13 @@ test("duplicate refund requests use the same Stripe idempotency key", () => {
     stripeRefundIdempotencyKey("payment-id"),
     stripeRefundIdempotencyKey("payment-id"),
   );
+});
+
+test("refund failure audit metadata exposes only a stable safe event code", () => {
+  assert.deepEqual(refundFailureAuditMetadata(), {
+    failureCode: "STRIPE_REFUND_REQUEST_FAILED",
+  });
+  assert.equal(JSON.stringify(refundFailureAuditMetadata()).includes("error"), false);
 });
 
 test("cancellation refund reporting distinguishes processing, verified completion and failure", () => {

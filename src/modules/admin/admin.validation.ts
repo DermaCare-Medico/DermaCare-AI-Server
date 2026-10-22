@@ -154,6 +154,10 @@ const doctorListQuerySchema = z.object({
 }).strict();
 
 const doctorIdParamsSchema = z.object({ id: uuidSchema }).strict();
+const doctorDocumentParamsSchema = z.object({
+    id: uuidSchema,
+    documentIndex: z.coerce.number().int().min(0),
+}).strict();
 
 const doctorApprovalListQuerySchema = z.object({
     ...paginationShape,
@@ -239,6 +243,7 @@ export const validateAdminUserStatus = validateRequest({
 });
 export const validateAdminDoctorList = validateRequest({ query: doctorListQuerySchema });
 export const validateAdminDoctorId = validateRequest({ params: doctorIdParamsSchema });
+export const validateAdminDoctorDocument = validateRequest({ params: doctorDocumentParamsSchema });
 export const validateAdminDoctorApprovalList = validateRequest({
     query: doctorApprovalListQuerySchema,
 });

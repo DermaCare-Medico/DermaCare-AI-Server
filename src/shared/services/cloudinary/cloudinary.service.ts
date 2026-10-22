@@ -72,6 +72,6 @@ export async function downloadPrivateImage(publicId: string): Promise<Buffer> {
     secure: true,
   });
   const response = await fetch(url);
-  if (!response.ok) throw new AppError("Stored screening image is unavailable", 502);
+  if (!response.ok) throw new AppError("Stored private image is unavailable", 502);
   return Buffer.from(await response.arrayBuffer());
 }

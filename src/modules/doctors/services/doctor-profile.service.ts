@@ -7,10 +7,40 @@ import {
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import type { DoctorApplicationInput, DoctorProfileUpdateInput } from "../doctors.validation.js";
-import { uploadPrivateImage } from "../../../shared/services/cloudinary/cloudinary.service.js";
+import { downloadPrivateImage, uploadPrivateImage } from "../../../shared/services/cloudinary/cloudinary.service.js";
 
-export const doctorDocumentBelongsToUser = (reference: string, userId: string) =>
-  reference.startsWith(`DermaCare-AI/doctor-documents/${userId}/`);
+export const doctorDocumentBelongsToUser = (reference: string, userId: string) => {
+  const escapedUserId = userId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `^DermaCare-AI/doctor-documents/${escapedUserId}/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$`,
+  ).test(reference);
+};
+
+export const selectOwnedDoctorDocument = (
+  references: string[],
+  documentIndex: number,
+  userId: string,
+) => {
+  const reference = references[documentIndex];
+  if (!reference) throw new AppError("Doctor document not found", 404);
+  if (!doctorDocumentBelongsToUser(reference, userId)) {
+    throw new AppError("Doctor document access denied", 403);
+  }
+  return reference;
+};
+
+export const downloadMyDoctorDocument = async (userId: string, documentIndex: number) => {
+  const profile = await prisma.doctorProfile.findUnique({
+    where: { userId },
+    select: { documentReferences: true },
+  });
+  if (!profile) throw new AppError("Doctor application not found", 404);
+  return downloadPrivateImage(selectOwnedDoctorDocument(
+    profile.documentReferences,
+    documentIndex,
+    userId,
+  ));
+};
 
 export const storeDoctorApplicationDocument = async (userId: string, filePath: string) => {
   const user = await prisma.user.findFirst({

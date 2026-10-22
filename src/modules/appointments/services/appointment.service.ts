@@ -22,6 +22,7 @@ import { canExposeMeeting } from "../../../integrations/google-calendar/meeting-
 import { presentDoctorSpecializations } from "../../doctors/doctor-specializations.presenter.js";
 import { requestStripeRefundsWithResult, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
 import { expireStripeCheckoutSessions } from "../../payments/services/payment-verification.service.js";
+import { noShowAuditData } from "./appointment-audit.rules.js";
 
 const httpError = (statusCode: number, message: string) => new AppError(message, statusCode);
 
@@ -490,7 +491,6 @@ const requestCancellation = async (userId: string, appointmentId: string, reason
                 entityId: appointment.id,
                 before: { status: appointment.status },
                 after: { status: AppointmentStatus.CANCELLATION_REQUESTED },
-                metadata: { reason },
             },
         });
         await createNotification({
@@ -564,7 +564,6 @@ const reviewCancellation = async (
                     entityId: appointment.id,
                     before: { status: appointment.status },
                     after: { status: AppointmentStatus.CANCELLED },
-                    metadata: { reviewNotes: input.reviewNotes },
                 },
             });
             await createNotification({
@@ -594,7 +593,6 @@ const reviewCancellation = async (
                     entityId: appointment.id,
                     before: { status: appointment.status },
                     after: { status: AppointmentStatus.CONFIRMED },
-                    metadata: { reviewNotes: input.reviewNotes },
                 },
             });
             await createNotification({
@@ -680,7 +678,7 @@ const cancelAppointment = async (
                 entityId: appointment.id,
                 before: { status: appointment.status },
                 after: { status: AppointmentStatus.CANCELLED },
-                metadata: { reason, actorRole: role },
+                metadata: { actorRole: role },
             },
         });
 
@@ -733,6 +731,10 @@ const markNoShow = async (
                 status: AppointmentStatus.NO_SHOW,
             },
             select: appointmentSelect,
+        });
+
+        await tx.auditLog.create({
+            data: noShowAuditData(userId, appointment.id, role),
         });
 
         await createNotification({
