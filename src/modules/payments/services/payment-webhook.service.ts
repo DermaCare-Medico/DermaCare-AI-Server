@@ -268,6 +268,22 @@ async function completeAppointment(session: Stripe.Checkout.Session, paymentId: 
       relatedEntityType: "Appointment",
       relatedEntityId: payment.appointment.id,
     }, tx);
+    await tx.auditLog.create({
+      data: {
+        actorUserId: payment.patient.userId,
+        action: "STRIPE_PAYMENT_VERIFIED",
+        entityType: "PaymentTransaction",
+        entityId: payment.id,
+        before: { status: payment.status },
+        after: { status: TransactionStatus.PAID, paidAt: true },
+        metadata: {
+          purpose: TransactionPurpose.APPOINTMENT,
+          appointmentId: payment.appointment.id,
+          amount: payment.amount.toString(),
+          currency: payment.currency,
+        },
+      },
+    });
     return { completed: true, refundPaymentIds: [] as string[] };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   assertLateRefundRequestsSucceeded(await requestStripeRefunds(result.refundPaymentIds));
@@ -347,6 +363,22 @@ async function completeOrder(session: Stripe.Checkout.Session, paymentId: string
       relatedEntityType: "Order",
       relatedEntityId: payment.order.id,
     }, tx);
+    await tx.auditLog.create({
+      data: {
+        actorUserId: payment.patient.userId,
+        action: "STRIPE_PAYMENT_VERIFIED",
+        entityType: "PaymentTransaction",
+        entityId: payment.id,
+        before: { status: payment.status },
+        after: { status: TransactionStatus.PAID, paidAt: true },
+        metadata: {
+          purpose: TransactionPurpose.MEDICINE_ORDER,
+          orderId: payment.order.id,
+          amount: payment.amount.toString(),
+          currency: payment.currency,
+        },
+      },
+    });
     return { refundPaymentIds: [] as string[] };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   assertLateRefundRequestsSucceeded(await requestStripeRefunds(result.refundPaymentIds));

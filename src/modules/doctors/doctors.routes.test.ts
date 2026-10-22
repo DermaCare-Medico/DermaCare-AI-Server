@@ -41,6 +41,7 @@ test("Doctor router exposes only canonical public and role-specific routes", () 
     { method: "GET", path: "/" },
     { method: "GET", path: "/:doctorId/slots" },
     { method: "GET", path: "/:doctorId" },
+    { method: "POST", path: "/application/documents" },
     { method: "POST", path: "/application" },
     { method: "GET", path: "/me/profile" },
     { method: "PATCH", path: "/me/profile" },

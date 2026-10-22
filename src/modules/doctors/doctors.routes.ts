@@ -3,6 +3,7 @@ import { Role } from "../../generated/prisma/client.js";
 import { authenticate } from "../../middlewares/authenticate.middleware.js";
 import { authorize } from "../../middlewares/authorize.middleware.js";
 import { asyncHandler } from "../../middlewares/asyncHandler.js";
+import { uploadScreeningImage } from "../../middlewares/upload.middleware.js";
 import { doctorController } from "./doctor.controller.js";
 
 import {
@@ -38,6 +39,14 @@ router.get(
 router.get("/:doctorId", doctorController.getById);
 
 // Authenticated user: apply and view own application
+router.post(
+  "/application/documents",
+  authenticate,
+  authorize(Role.USER, Role.PATIENT, Role.DOCTOR),
+  uploadScreeningImage,
+  doctorController.uploadApplicationDocument,
+);
+
 router.post(
   "/application",
   authenticate,

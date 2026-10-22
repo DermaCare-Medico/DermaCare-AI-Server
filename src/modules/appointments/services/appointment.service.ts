@@ -482,6 +482,17 @@ const requestCancellation = async (userId: string, appointmentId: string, reason
             },
             select: appointmentSelect,
         });
+        await tx.auditLog.create({
+            data: {
+                actorUserId: userId,
+                action: "APPOINTMENT_CANCELLATION_REQUESTED",
+                entityType: "Appointment",
+                entityId: appointment.id,
+                before: { status: appointment.status },
+                after: { status: AppointmentStatus.CANCELLATION_REQUESTED },
+                metadata: { reason },
+            },
+        });
         await createNotification({
             userId: appointment.doctor.userId,
             title: "Cancellation requested",
@@ -545,6 +556,17 @@ const reviewCancellation = async (
                 data: { status: SlotStatus.AVAILABLE },
             });
             const refundPaymentIds = await stagePaymentRefunds(tx, { appointmentId });
+            await tx.auditLog.create({
+                data: {
+                    actorUserId: userId,
+                    action: "APPOINTMENT_CANCELLATION_APPROVED",
+                    entityType: "Appointment",
+                    entityId: appointment.id,
+                    before: { status: appointment.status },
+                    after: { status: AppointmentStatus.CANCELLED },
+                    metadata: { reviewNotes: input.reviewNotes },
+                },
+            });
             await createNotification({
                 userId: appointment.patient.userId,
                 title: "Cancellation approved",
@@ -563,6 +585,17 @@ const reviewCancellation = async (
                     cancellationRequestedAt: null,
                 },
                 select: appointmentSelect,
+            });
+            await tx.auditLog.create({
+                data: {
+                    actorUserId: userId,
+                    action: "APPOINTMENT_CANCELLATION_REJECTED",
+                    entityType: "Appointment",
+                    entityId: appointment.id,
+                    before: { status: appointment.status },
+                    after: { status: AppointmentStatus.CONFIRMED },
+                    metadata: { reviewNotes: input.reviewNotes },
+                },
             });
             await createNotification({
                 userId: appointment.patient.userId,
@@ -638,6 +671,18 @@ const cancelAppointment = async (
         });
 
         const refundPaymentIds = await stagePaymentRefunds(tx, { appointmentId });
+
+        await tx.auditLog.create({
+            data: {
+                actorUserId: userId,
+                action: "APPOINTMENT_CANCELLED",
+                entityType: "Appointment",
+                entityId: appointment.id,
+                before: { status: appointment.status },
+                after: { status: AppointmentStatus.CANCELLED },
+                metadata: { reason, actorRole: role },
+            },
+        });
 
         const notifyUserId = role === Role.PATIENT ? appointment.doctor.userId : appointment.patient.userId;
         await createNotification({

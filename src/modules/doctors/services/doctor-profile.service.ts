@@ -7,6 +7,20 @@ import {
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import type { DoctorApplicationInput, DoctorProfileUpdateInput } from "../doctors.validation.js";
+import { uploadPrivateImage } from "../../../shared/services/cloudinary/cloudinary.service.js";
+
+export const doctorDocumentBelongsToUser = (reference: string, userId: string) =>
+  reference.startsWith(`DermaCare-AI/doctor-documents/${userId}/`);
+
+export const storeDoctorApplicationDocument = async (userId: string, filePath: string) => {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null, role: { in: [Role.USER, Role.PATIENT, Role.DOCTOR] } },
+    select: { id: true },
+  });
+  if (!user) throw new AppError("Doctor document owner not found", 403);
+  const uploaded = await uploadPrivateImage(filePath, `DermaCare-AI/doctor-documents/${userId}`);
+  return uploaded.public_id;
+};
 
 export const submitDoctorApplication = async (
   userId: string,
@@ -35,6 +49,9 @@ export const submitDoctorApplication = async (
 
   if (user.role === Role.ADMIN || user.role === Role.STORE_OWNER) {
     throw new AppError("This account cannot apply as a doctor", 403);
+  }
+  if (input.documentReferences.some((reference) => !doctorDocumentBelongsToUser(reference, userId))) {
+    throw new AppError("Doctor document does not belong to this account", 403);
   }
 
   if (
@@ -77,6 +94,7 @@ export const submitDoctorApplication = async (
           experienceYears: input.experienceYears,
           consultationFee: input.consultationFee,
           bio: input.bio,
+          documentReferences: input.documentReferences,
           approvalStatus: DoctorApprovalStatus.PENDING,
           approvedById: null,
           approvedAt: null,
@@ -105,6 +123,7 @@ export const submitDoctorApplication = async (
         experienceYears: input.experienceYears,
         consultationFee: input.consultationFee,
         bio: input.bio,
+        documentReferences: input.documentReferences,
         approvalStatus: DoctorApprovalStatus.PENDING,
         specializations: {
           create: input.specializationIds.map((specializationId) => ({

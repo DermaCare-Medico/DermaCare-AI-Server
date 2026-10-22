@@ -34,15 +34,16 @@ test("staging keeps Stripe money PAID and only immediately refunds demo payments
   const tx = {
     paymentTransaction: {
       findMany: async () => [
-        { id: "stripe-payment", provider: "STRIPE", refundStatus: null },
-        { id: "demo-payment", provider: "DEMO", refundStatus: null },
-        { id: "legacy-payment", provider: null, refundStatus: null },
+        { id: "stripe-payment", provider: "STRIPE", refundStatus: null, patient: { userId: "patient-user" } },
+        { id: "demo-payment", provider: "DEMO", refundStatus: null, patient: { userId: "patient-user" } },
+        { id: "legacy-payment", provider: null, refundStatus: null, patient: { userId: "patient-user" } },
       ],
       update: async (args: { where: unknown; data: Record<string, unknown> }) => {
         updates.push(args);
         return args;
       },
     },
+    auditLog: { create: async (args: unknown) => args },
     doctorPayoutItem: { findUnique: async () => null },
   } as unknown as Prisma.TransactionClient;
 

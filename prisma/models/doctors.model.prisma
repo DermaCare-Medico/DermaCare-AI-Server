@@ -18,6 +18,7 @@ model DoctorProfile {
   experienceYears Int                  @default(0) @map("experience_years")
   consultationFee Decimal              @map("consultation_fee") @db.Decimal(10, 2)
   bio             String?
+  documentReferences String[]             @default([]) @map("document_references")
   approvalStatus  DoctorApprovalStatus @default(PENDING) @map("approval_status")
   approvedById    String?              @map("approved_by") @db.Uuid
   approvedAt      DateTime?            @map("approved_at") @db.Timestamp(6)

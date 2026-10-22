@@ -17,6 +17,7 @@ const doctorDetailsSelect = {
     experienceYears: true,
     consultationFee: true,
     bio: true,
+    documentReferences: true,
     approvalStatus: true,
     approvedAt: true,
     rejectionReason: true,
@@ -80,7 +81,7 @@ const getDoctor = async (adminUserId: string, doctorId: string) => {
         select: doctorDetailsSelect,
     });
     if (!doctor) throw new AppError("Doctor not found", 404);
-    return { ...doctor, documentReferences: [] as string[] };
+    return doctor;
 };
 
 const listPendingApprovals = async (adminUserId: string, page: number, limit: number) => {
@@ -101,6 +102,7 @@ const listPendingApprovals = async (adminUserId: string, page: number, limit: nu
                 licenseNumber: true,
                 qualifications: true,
                 experienceYears: true,
+                documentReferences: true,
                 createdAt: true,
                 user: {
                     select: { id: true, name: true, email: true, status: true },
@@ -116,10 +118,7 @@ const listPendingApprovals = async (adminUserId: string, page: number, limit: nu
     ]);
 
     return {
-        requests: requests.map((request) => ({
-            ...request,
-            documentReferences: [] as string[],
-        })),
+        requests,
         pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
 };
@@ -186,7 +185,7 @@ const approveDoctor = async (adminUserId: string, doctorId: string) => {
             where: { id: doctorId },
             select: doctorDetailsSelect,
         });
-        return { ...approved, documentReferences: [] as string[] };
+        return approved;
     });
 };
 
@@ -248,7 +247,7 @@ const rejectDoctor = async (adminUserId: string, doctorId: string, reason: strin
             where: { id: doctorId },
             select: doctorDetailsSelect,
         });
-        return { ...rejected, documentReferences: [] as string[] };
+        return rejected;
     });
 };
 

@@ -343,6 +343,17 @@ export async function completeDoctorConsultation(
       throw new AppError("Appointment state changed; please retry", HTTP_STATUS.CONFLICT);
     }
 
+    await tx.auditLog.create({
+      data: {
+        actorUserId: userId,
+        action: "APPOINTMENT_COMPLETED",
+        entityType: "Appointment",
+        entityId: appointment.id,
+        before: { status: AppointmentStatus.CONFIRMED },
+        after: { status: AppointmentStatus.COMPLETED },
+      },
+    });
+
     await createNotificationIfEligible({
       userId: appointment.patient.userId,
       title: "Consultation completed",

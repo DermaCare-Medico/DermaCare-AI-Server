@@ -5,10 +5,24 @@ import {
   getMyDoctorProfile,
   submitDoctorApplication,
   updateMyDoctorProfile,
+  storeDoctorApplicationDocument,
 } from "../doctor.service.js";
 import { AppError } from "../../../shared/errors/AppError.js";
+import { unlink } from "node:fs/promises";
 
 export const doctorProfileController = {
+  uploadApplicationDocument: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.auth) throw new AppError("Authentication required", 401);
+      if (!req.file) throw new AppError("Doctor document image is required", 400);
+      const documentReference = await storeDoctorApplicationDocument(req.auth.userId, req.file.path);
+      res.status(201).json({ success: true, data: { documentReference } });
+    } catch (error) {
+      next(error);
+    } finally {
+      if (req.file?.path) await unlink(req.file.path).catch(() => undefined);
+    }
+  },
   submitApplication: async (
     req: Request,
     res: Response,

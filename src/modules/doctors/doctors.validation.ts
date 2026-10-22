@@ -8,7 +8,10 @@ export const doctorApplicationSchema = z.object({
   consultationFee: z.number().min(0).max(1000000),
   bio: z.string().trim().max(2000).optional(),
   specializationIds: z.array(z.string().uuid()).min(1).max(20),
-});
+  documentReferences: z.array(
+    z.string().trim().regex(/^DermaCare-AI\/doctor-documents\/[A-Za-z0-9_\-/.]+$/),
+  ).min(1).max(10),
+}).strict();
 
 export const doctorProfileUpdateSchema = z.object({
   qualifications: z.array(z.string().trim().min(1)).min(1).max(20).optional(),

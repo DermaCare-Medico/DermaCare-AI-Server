@@ -65,17 +65,34 @@ export async function stagePaymentRefunds(
 ) {
   const payments = await tx.paymentTransaction.findMany({
     where: { ...target, status: TransactionStatus.PAID },
-    select: { id: true, provider: true, refundStatus: true },
+    select: {
+      id: true,
+      provider: true,
+      refundStatus: true,
+      patient: { select: { userId: true } },
+    },
   });
   const stripePaymentIds: string[] = [];
   let consultationRefunded = false;
   for (const payment of payments) {
     if (payment.provider === "STRIPE") {
       if (payment.refundStatus !== RefundStatus.SUCCEEDED) {
+        if (payment.refundStatus !== RefundStatus.PENDING) {
         await tx.paymentTransaction.update({
           where: { id: payment.id },
           data: { refundStatus: RefundStatus.PENDING, refundError: null },
         });
+        await tx.auditLog.create({
+          data: {
+            actorUserId: payment.patient.userId,
+            action: "STRIPE_REFUND_STATUS_CHANGED",
+            entityType: "PaymentTransaction",
+            entityId: payment.id,
+            before: { refundStatus: payment.refundStatus },
+            after: { refundStatus: RefundStatus.PENDING },
+          },
+        });
+        }
         stripePaymentIds.push(payment.id);
       }
     } else if (payment.provider === "DEMO") {
@@ -88,6 +105,16 @@ export async function stagePaymentRefunds(
           refundError: null,
         },
       });
+      await tx.auditLog.create({
+        data: {
+          actorUserId: payment.patient.userId,
+          action: "DEMO_REFUND_COMPLETED",
+          entityType: "PaymentTransaction",
+          entityId: payment.id,
+          before: { status: TransactionStatus.PAID, refundStatus: payment.refundStatus },
+          after: { status: TransactionStatus.REFUNDED, refundStatus: RefundStatus.SUCCEEDED },
+        },
+      });
       consultationRefunded = true;
     } else {
       await tx.paymentTransaction.update({
@@ -95,6 +122,17 @@ export async function stagePaymentRefunds(
         data: {
           refundStatus: RefundStatus.FAILED,
           refundError: "Automatic refunds are not supported for this payment provider",
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorUserId: payment.patient.userId,
+          action: "REFUND_UNSUPPORTED",
+          entityType: "PaymentTransaction",
+          entityId: payment.id,
+          before: { refundStatus: payment.refundStatus },
+          after: { refundStatus: RefundStatus.FAILED },
+          metadata: { provider: payment.provider },
         },
       });
     }
@@ -132,10 +170,22 @@ async function persistRefund(paymentId: string, refund: Stripe.Refund) {
   const checkoutToExpire = await prisma.$transaction(async (tx) => {
     const payment = await tx.paymentTransaction.findUnique({
       where: { id: paymentId },
-      select: { appointmentId: true },
+      select: {
+        appointmentId: true,
+        refundStatus: true,
+        patient: { select: { userId: true } },
+      },
     });
     const updated = await tx.paymentTransaction.updateMany({
-      where: { id: paymentId, provider: "STRIPE", status: TransactionStatus.PAID },
+      where: {
+        id: paymentId,
+        provider: "STRIPE",
+        status: TransactionStatus.PAID,
+        OR: [
+          { refundStatus: null },
+          { refundStatus: { not: refundStatus } },
+        ],
+      },
       data: {
         ...(paymentIntentId && { stripePaymentIntentId: paymentIntentId }),
         stripeRefundId: refund.id,
@@ -147,6 +197,20 @@ async function persistRefund(paymentId: string, refund: Stripe.Refund) {
         }),
       },
     });
+    if (updated.count === 1 && payment) {
+      await tx.auditLog.create({
+        data: {
+          actorUserId: payment.patient.userId,
+          action: "STRIPE_REFUND_STATUS_CHANGED",
+          entityType: "PaymentTransaction",
+          entityId: paymentId,
+          before: { refundStatus: payment.refundStatus },
+          after: { refundStatus, paymentStatus: refundStatus === RefundStatus.SUCCEEDED
+            ? TransactionStatus.REFUNDED : TransactionStatus.PAID },
+          metadata: { stripeRefundId: refund.id },
+        },
+      });
+    }
     if (updated.count !== 1 || refundStatus !== RefundStatus.SUCCEEDED || !payment?.appointmentId) return null;
     return reconcileRefundedAppointmentPayout(tx, payment.appointmentId);
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -206,9 +270,28 @@ export async function requestStripeRefund(paymentId: string) {
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : "Stripe refund request failed";
-    await prisma.paymentTransaction.updateMany({
-      where: { id: payment.id, provider: "STRIPE", status: TransactionStatus.PAID },
-      data: { refundStatus: RefundStatus.FAILED, refundError: message },
+    await prisma.$transaction(async (tx) => {
+      const current = await tx.paymentTransaction.findUnique({
+        where: { id: payment.id },
+        select: { refundStatus: true, patient: { select: { userId: true } } },
+      });
+      const updated = await tx.paymentTransaction.updateMany({
+        where: { id: payment.id, provider: "STRIPE", status: TransactionStatus.PAID },
+        data: { refundStatus: RefundStatus.FAILED, refundError: message },
+      });
+      if (updated.count === 1 && current?.refundStatus !== RefundStatus.FAILED) {
+        await tx.auditLog.create({
+          data: {
+            actorUserId: current?.patient.userId,
+            action: "STRIPE_REFUND_STATUS_CHANGED",
+            entityType: "PaymentTransaction",
+            entityId: payment.id,
+            before: { refundStatus: current?.refundStatus ?? null },
+            after: { refundStatus: RefundStatus.FAILED },
+            metadata: { error: message },
+          },
+        });
+      }
     });
     return false;
   }
