@@ -33,6 +33,7 @@ test("staging keeps Stripe money PAID and only immediately refunds demo payments
       findMany: async () => [
         { id: "stripe-payment", provider: "STRIPE", refundStatus: null },
         { id: "demo-payment", provider: "DEMO", refundStatus: null },
+        { id: "legacy-payment", provider: null, refundStatus: null },
       ],
       update: async (args: { where: unknown; data: Record<string, unknown> }) => {
         updates.push(args);
@@ -47,6 +48,9 @@ test("staging keeps Stripe money PAID and only immediately refunds demo payments
   assert.equal(updates[0]!.data.refundStatus, RefundStatus.PENDING);
   assert.equal(updates[0]!.data.status, undefined);
   assert.equal(updates[1]!.data.status, TransactionStatus.REFUNDED);
+  assert.equal(updates[2]!.data.status, undefined);
+  assert.equal(updates[2]!.data.refundStatus, RefundStatus.FAILED);
+  assert.match(String(updates[2]!.data.refundError), /not supported/i);
 });
 
 test("duplicate refund requests use the same Stripe idempotency key", () => {

@@ -42,7 +42,7 @@ export async function stagePaymentRefunds(
         });
         stripePaymentIds.push(payment.id);
       }
-    } else {
+    } else if (payment.provider === "DEMO") {
       await tx.paymentTransaction.update({
         where: { id: payment.id },
         data: {
@@ -50,6 +50,14 @@ export async function stagePaymentRefunds(
           refundStatus: RefundStatus.SUCCEEDED,
           refundedAt: new Date(),
           refundError: null,
+        },
+      });
+    } else {
+      await tx.paymentTransaction.update({
+        where: { id: payment.id },
+        data: {
+          refundStatus: RefundStatus.FAILED,
+          refundError: "Automatic refunds are not supported for this payment provider",
         },
       });
     }
@@ -78,9 +86,13 @@ async function resolvePaymentIntent(payment: {
 
 async function persistRefund(paymentId: string, refund: Stripe.Refund) {
   const refundStatus = refundStateForStripeStatus(refund.status);
+  const paymentIntentId = typeof refund.payment_intent === "string"
+    ? refund.payment_intent
+    : refund.payment_intent?.id;
   await prisma.paymentTransaction.updateMany({
     where: { id: paymentId, provider: "STRIPE", status: TransactionStatus.PAID },
     data: {
+      ...(paymentIntentId && { stripePaymentIntentId: paymentIntentId }),
       stripeRefundId: refund.id,
       refundStatus,
       refundError: refund.failure_reason ?? null,
@@ -154,9 +166,14 @@ export async function reconcileStripeRefund(refund: Stripe.Refund) {
         ...(paymentId ? [{ id: paymentId }] : []),
       ],
     },
-    select: { id: true, amount: true, status: true },
+    select: { id: true, amount: true, status: true, stripePaymentIntentId: true },
   });
   if (!payment || payment.status === TransactionStatus.REFUNDED) return;
   if (refund.amount !== toStripeMinorUnits(payment.amount)) return;
+  const refundPaymentIntentId = typeof refund.payment_intent === "string"
+    ? refund.payment_intent
+    : refund.payment_intent?.id;
+  if (payment.stripePaymentIntentId
+    && refundPaymentIntentId !== payment.stripePaymentIntentId) return;
   await persistRefund(payment.id, refund);
 }
