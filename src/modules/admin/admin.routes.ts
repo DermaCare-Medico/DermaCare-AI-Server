@@ -58,6 +58,11 @@ adminRouter.post(
     asyncHandler(doctorPayoutAdminController.sendPayout),
 );
 adminRouter.get(
+    "/doctor-payments/:id",
+    validateAdminPayoutId,
+    asyncHandler(doctorPayoutAdminController.getPayout),
+);
+adminRouter.get(
     "/doctors/earnings/summary",
     validateAdminMonthlyEarningsQuery,
     asyncHandler(doctorPayoutAdminController.getMonthlyEarningsSummary),

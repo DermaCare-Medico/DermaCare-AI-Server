@@ -4,7 +4,6 @@ import {
     DoctorApprovalStatus,
     PayoutStatus,
     Prisma,
-    NotificationType,
     TransactionPurpose,
     TransactionStatus,
 } from "../../../generated/prisma/client.js";
@@ -12,12 +11,21 @@ import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import type { AdminPayoutListQuery } from "../admin.validation.js";
 import { requireActiveAdmin } from "./admin.service.js";
-import { createNotification } from "../../notifications/services/notification.service.js";
 import {
     calculateConsultationEarnings,
     getEligiblePayment,
     getMonthDateRange,
 } from "../../doctors/services/doctor-earnings.rules.js";
+import Stripe from "stripe";
+import { env } from "../../../config/env.js";
+import { buildCheckoutRedirects, doctorPayoutCheckoutIdempotencyKey, toStripeMinorUnits } from "../../payments/services/stripe-payment.rules.js";
+
+let stripeClient: Stripe | undefined;
+const stripe = () => {
+    if (!env.STRIPE_SECRET_KEY) throw new AppError("Stripe Checkout is not configured", 503);
+    stripeClient ??= new Stripe(env.STRIPE_SECRET_KEY);
+    return stripeClient;
+};
 
 const payoutSelect = {
     id: true,
@@ -69,15 +77,23 @@ const listPayouts = async (adminUserId: string, query: AdminPayoutListQuery) => 
     };
 };
 
+const getPayout = async (adminUserId: string, payoutId: string) => {
+    await requireActiveAdmin(adminUserId);
+    const payout = await prisma.doctorPayout.findUnique({ where: { id: payoutId }, select: payoutSelect });
+    if (!payout) throw new AppError("Doctor payout not found", 404);
+    return payout;
+};
+
 const sendPayout = async (adminUserId: string, payoutId: string) => {
     await requireActiveAdmin(adminUserId);
-
-    return prisma.$transaction(async (tx) => {
-        const payout = await tx.doctorPayout.findUnique({
+    let payout = await prisma.doctorPayout.findUnique({
             where: { id: payoutId },
             select: {
+                id: true,
+                doctorId: true,
                 status: true,
                 netAmount: true,
+                transactionReference: true,
                 totalConsultations: true,
                 doctor: {
                     select: {
@@ -88,64 +104,63 @@ const sendPayout = async (adminUserId: string, payoutId: string) => {
             },
         });
 
-        if (!payout) throw new AppError("Doctor payout not found", 404);
-        if (payout.status !== PayoutStatus.PENDING) {
+    if (!payout) throw new AppError("Doctor payout not found", 404);
+    if (payout.status === PayoutStatus.PROCESSING && payout.transactionReference) {
+        const existing = await stripe().checkout.sessions.retrieve(payout.transactionReference);
+        if (existing.status === "open" && existing.url) {
+            return { checkoutUrl: existing.url, sessionId: existing.id, payoutId, status: payout.status };
+        }
+        if (existing.status === "expired") {
+            await prisma.doctorPayout.updateMany({
+                where: { id: payoutId, status: PayoutStatus.PROCESSING, transactionReference: existing.id },
+                data: { status: PayoutStatus.PENDING },
+            });
+            payout = { ...payout, status: PayoutStatus.PENDING };
+        } else {
+            throw new AppError("Payout confirmation is being processed", 409);
+        }
+    }
+    if (payout.status !== PayoutStatus.PENDING) {
             throw new AppError("Payout has already been processed", 409);
-        }
-        if (payout.netAmount.lte(0) || payout.totalConsultations < 1) {
+    }
+    if (payout.netAmount.lte(0) || payout.totalConsultations < 1) {
             throw new AppError("Payout is not eligible for processing", 400);
-        }
-        if (
+    }
+    if (
             payout.doctor.approvalStatus !== DoctorApprovalStatus.APPROVED
             || payout.doctor.user.status !== AccountStatus.ACTIVE
             || payout.doctor.user.deletedAt
-        ) {
+    ) {
             throw new AppError("Doctor is not eligible to receive payouts", 400);
-        }
+    }
 
-        const paidAt = new Date();
-        const transactionReference = `DEMO-${payoutId}-${paidAt.getTime()}`;
-        const updated = await tx.doctorPayout.updateMany({
-            where: { id: payoutId, status: PayoutStatus.PENDING },
-            data: {
-                status: PayoutStatus.PAID,
-                paidAt,
-                transactionReference,
-            },
-        });
+    const redirects = buildCheckoutRedirects(env.CLIENT_URL, "doctorPayout", payoutId);
+    const attempt = payout.transactionReference ?? "initial";
+    const session = await stripe().checkout.sessions.create({
+        mode: "payment",
+        success_url: redirects.successUrl,
+        cancel_url: redirects.cancelUrl,
+        client_reference_id: payoutId,
+        metadata: { context: "doctorPayout", payoutId, doctorId: payout.doctorId, adminUserId },
+        line_items: [{ quantity: 1, price_data: {
+            currency: "bdt",
+            unit_amount: toStripeMinorUnits(payout.netAmount),
+            product_data: { name: "Doctor monthly demo payout" },
+        } }],
+    }, { idempotencyKey: doctorPayoutCheckoutIdempotencyKey(payoutId, attempt) });
+    if (!session.url) throw new AppError("Stripe did not return a checkout URL", 502);
 
-        if (updated.count !== 1) throw new AppError("Payout has already been processed", 409);
-
-        await tx.auditLog.create({
-            data: {
-                actorUserId: adminUserId,
-                action: "DOCTOR_PAYOUT_SENT",
-                entityType: "DoctorPayout",
-                entityId: payoutId,
-                before: { status: PayoutStatus.PENDING },
-                after: {
-                    status: PayoutStatus.PAID,
-                    paidAt,
-                    transactionReference,
-                },
-                metadata: { netAmount: payout.netAmount.toString() },
-            },
-        });
-
-        await createNotification({
-            userId: payout.doctor.user.id,
-            title: "Doctor payout successful",
-            message: "Your doctor payout was processed successfully.",
-            notificationType: NotificationType.PAYMENT,
-            relatedEntityType: "DoctorPayout",
-            relatedEntityId: payoutId,
-        }, tx);
-
-        return tx.doctorPayout.findUniqueOrThrow({
-            where: { id: payoutId },
-            select: payoutSelect,
-        });
+    const claimed = await prisma.doctorPayout.updateMany({
+        where: { id: payoutId, status: PayoutStatus.PENDING },
+        data: { status: PayoutStatus.PROCESSING, transactionReference: session.id },
     });
+    if (claimed.count !== 1) {
+        const current = await prisma.doctorPayout.findUnique({ where: { id: payoutId }, select: { status: true, transactionReference: true } });
+        if (current?.status !== PayoutStatus.PROCESSING || current.transactionReference !== session.id) {
+            throw new AppError("Payout has already been processed", 409);
+        }
+    }
+    return { checkoutUrl: session.url, sessionId: session.id, payoutId, status: PayoutStatus.PROCESSING };
 };
 
 const getMonthlyEarningsSummary = async (
@@ -545,6 +560,7 @@ const generateMonthlyPayout = async (
 
 export const doctorPayoutAdminService = {
     listPayouts,
+    getPayout,
     sendPayout,
     getMonthlyEarningsSummary,
     getDoctorPayable,

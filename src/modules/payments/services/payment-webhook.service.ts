@@ -5,6 +5,7 @@ import {
   MeetingProvisioningStatus,
   NotificationType,
   OrderStatus,
+  PayoutStatus,
   Prisma,
   SlotStatus,
   TransactionPurpose,
@@ -16,7 +17,7 @@ import { AppError } from "../../../shared/errors/AppError.js";
 import { requestMeetingProvisioning } from "../../../integrations/google-calendar/meeting-provisioning.worker.js";
 import { createNotificationIfEligible } from "../../notifications/services/notification.service.js";
 import { isOrderPaymentExpired } from "../../orders/services/order-payment.rules.js";
-import { stripePaymentMatches } from "./stripe-payment.rules.js";
+import { stripeDoctorPayoutMatches, stripePaymentMatches } from "./stripe-payment.rules.js";
 import {
   reconcileStripeRefund,
   requestStripeRefunds,
@@ -42,6 +43,17 @@ export function verifyStripeEvent(rawBody: Buffer, signature: string) {
 }
 
 async function markUnsuccessful(session: Stripe.Checkout.Session) {
+  if (session.metadata?.context === "doctorPayout") {
+    await prisma.doctorPayout.updateMany({
+      where: {
+        id: session.metadata.payoutId,
+        status: PayoutStatus.PROCESSING,
+        transactionReference: session.id,
+      },
+      data: { status: PayoutStatus.PENDING },
+    });
+    return;
+  }
   await prisma.paymentTransaction.updateMany({
     where: {
       provider: "STRIPE",
@@ -50,6 +62,73 @@ async function markUnsuccessful(session: Stripe.Checkout.Session) {
     },
     data: { status: TransactionStatus.FAILED },
   });
+}
+
+export async function completeDoctorPayout(session: Stripe.Checkout.Session) {
+  if (session.payment_status !== "paid") return;
+  const paymentIntentId = typeof session.payment_intent === "string"
+    ? session.payment_intent
+    : session.payment_intent?.id;
+  if (!paymentIntentId) throw new AppError("Stripe PaymentIntent reference is missing", 400);
+  const payoutId = session.metadata?.payoutId;
+  const doctorId = session.metadata?.doctorId;
+  const adminUserId = session.metadata?.adminUserId;
+  if (!payoutId || !doctorId || !adminUserId) throw new AppError("Invalid doctor payout metadata", 400);
+
+  await prisma.$transaction(async (tx) => {
+    const payout = await tx.doctorPayout.findUnique({
+      where: { id: payoutId },
+      select: {
+        id: true, doctorId: true, netAmount: true, status: true, transactionReference: true,
+        doctor: { select: { userId: true } },
+      },
+    });
+    if (!payout || !stripeDoctorPayoutMatches({
+      id: payout.id,
+      doctorId: payout.doctorId,
+      amount: payout.netAmount,
+      sessionId: payout.transactionReference ?? "",
+    }, {
+      id: session.id,
+      clientReferenceId: session.client_reference_id,
+      context: session.metadata?.context,
+      payoutId: session.metadata?.payoutId,
+      doctorId,
+      amountTotal: session.amount_total,
+      currency: session.currency,
+    })) {
+      throw new AppError("Stripe payment details do not match the doctor payout", 400);
+    }
+    if (payout.status === PayoutStatus.PAID) return;
+    if (payout.status !== PayoutStatus.PROCESSING) {
+      throw new AppError("Doctor payout is not awaiting payment", 409);
+    }
+    const paidAt = new Date();
+    const claimed = await tx.doctorPayout.updateMany({
+      where: { id: payout.id, status: PayoutStatus.PROCESSING, transactionReference: session.id },
+      data: { status: PayoutStatus.PAID, paidAt },
+    });
+    if (claimed.count !== 1) return;
+    await tx.auditLog.create({
+      data: {
+        actorUserId: adminUserId,
+        action: "DOCTOR_PAYOUT_PAID_BY_STRIPE",
+        entityType: "DoctorPayout",
+        entityId: payout.id,
+        before: { status: PayoutStatus.PROCESSING },
+        after: { status: PayoutStatus.PAID, paidAt, checkoutSessionId: session.id, paymentIntentId },
+        metadata: { netAmount: payout.netAmount.toString(), currency: "BDT" },
+      },
+    });
+    await createNotificationIfEligible({
+      userId: payout.doctor.userId,
+      title: "Doctor payout successful",
+      message: "Your doctor payout was processed successfully.",
+      notificationType: NotificationType.PAYMENT,
+      relatedEntityType: "DoctorPayout",
+      relatedEntityId: payout.id,
+    }, tx);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function stageCapturedStripePaymentForRefund(
@@ -275,6 +354,10 @@ async function completeOrder(session: Stripe.Checkout.Session, paymentId: string
 
 async function handlePaidSession(session: Stripe.Checkout.Session) {
   if (session.payment_status !== "paid") return;
+  if (session.metadata?.context === "doctorPayout") {
+    await completeDoctorPayout(session);
+    return;
+  }
   let payment = await prisma.paymentTransaction.findUnique({
     where: { providerTransactionId: session.id },
     select: { id: true, purpose: true },

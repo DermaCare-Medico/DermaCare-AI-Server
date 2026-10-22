@@ -1,6 +1,6 @@
 import { Prisma } from "../../../generated/prisma/client.js";
 
-export type CheckoutContext = "appointment" | "order";
+export type CheckoutContext = "appointment" | "order" | "doctorPayout";
 
 export const toStripeMinorUnits = (amount: Prisma.Decimal) => {
   const minor = amount.mul(100);
@@ -21,6 +21,7 @@ export const buildCheckoutRedirects = (
   success.searchParams.set(`${context}Id`, entityId);
 
   const cancel = new URL("/payments/cancel", clientUrl);
+  cancel.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
   cancel.searchParams.set("context", context);
   cancel.searchParams.set(`${context}Id`, entityId);
   return { successUrl: success.toString(), cancelUrl: cancel.toString() };
@@ -33,3 +34,24 @@ export const stripePaymentMatches = (
   currency: string | null,
 ) => amountTotal === toStripeMinorUnits(expectedAmount)
   && currency?.toUpperCase() === expectedCurrency.toUpperCase();
+
+export const doctorPayoutCheckoutIdempotencyKey = (payoutId: string, priorSessionId?: string | null) =>
+  `doctor-payout-checkout-${payoutId}-${priorSessionId ?? "initial"}`;
+
+export const stripeDoctorPayoutMatches = (
+  payout: { id: string; doctorId: string; amount: Prisma.Decimal; sessionId: string },
+  checkout: {
+    id: string;
+    clientReferenceId: string | null;
+    context?: string;
+    payoutId?: string;
+    doctorId?: string;
+    amountTotal: number | null;
+    currency: string | null;
+  },
+) => checkout.context === "doctorPayout"
+  && checkout.id === payout.sessionId
+  && checkout.clientReferenceId === payout.id
+  && checkout.payoutId === payout.id
+  && checkout.doctorId === payout.doctorId
+  && stripePaymentMatches(payout.amount, "BDT", checkout.amountTotal, checkout.currency);
