@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
+    "build:render": "npm run download:model && npm run db:generate && npm run build",
+    "download:model": "node scripts/download-onnx-model.mjs",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test:orders": "tsx --test src/modules/orders/services/*.test.ts",
