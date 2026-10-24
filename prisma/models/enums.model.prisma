@@ -93,7 +93,7 @@ enum ScreeningStatus {
   PROCESSING
   COMPLETED
   FAILED
-  
+
   @@map("screening_status")
 }
 

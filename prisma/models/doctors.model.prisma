@@ -11,22 +11,22 @@ model Specialization {
 }
 
 model DoctorProfile {
-  id              String               @id @default(uuid()) @db.Uuid
-  userId          String               @unique @map("user_id") @db.Uuid
-  licenseNumber   String               @unique @map("license_number") @db.VarChar(100)
-  qualifications  String[]             @default([])
-  experienceYears Int                  @default(0) @map("experience_years")
-  consultationFee Decimal              @map("consultation_fee") @db.Decimal(10, 2)
-  bio             String?
+  id                 String               @id @default(uuid()) @db.Uuid
+  userId             String               @unique @map("user_id") @db.Uuid
+  licenseNumber      String               @unique @map("license_number") @db.VarChar(100)
+  qualifications     String[]             @default([])
+  experienceYears    Int                  @default(0) @map("experience_years")
+  consultationFee    Decimal              @map("consultation_fee") @db.Decimal(10, 2)
+  bio                String?
   documentReferences String[]             @default([]) @map("document_references")
-  approvalStatus  DoctorApprovalStatus @default(PENDING) @map("approval_status")
-  approvedById    String?              @map("approved_by") @db.Uuid
-  approvedAt      DateTime?            @map("approved_at") @db.Timestamp(6)
-  rejectionReason String?              @map("rejection_reason")
-  rating          Decimal?             @db.Decimal(3, 2)
-  ratingCount     Int                  @default(0) @map("rating_count")
-  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamp(6)
+  approvalStatus     DoctorApprovalStatus @default(PENDING) @map("approval_status")
+  approvedById       String?              @map("approved_by") @db.Uuid
+  approvedAt         DateTime?            @map("approved_at") @db.Timestamp(6)
+  rejectionReason    String?              @map("rejection_reason")
+  rating             Decimal?             @db.Decimal(3, 2)
+  ratingCount        Int                  @default(0) @map("rating_count")
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamp(6)
 
   appointments     Appointment[]
   conversations    Conversation[]
