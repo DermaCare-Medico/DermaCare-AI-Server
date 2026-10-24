@@ -28,15 +28,19 @@ const MODEL_DIR = path.resolve(
   "vit-skin-disease"
 );
 
-const INT8_MODEL_PATH = path.join(MODEL_DIR, "model-int8.onnx");
-const FP32_MODEL_PATH = path.join(MODEL_DIR, "model.onnx");
+const MODEL_PATH = path.join(MODEL_DIR, "model-int8.onnx");
 
 async function resolveModelPath(): Promise<string> {
   try {
-    await fs.access(INT8_MODEL_PATH);
-    return INT8_MODEL_PATH;
+    const modelStats = await fs.stat(MODEL_PATH);
+    if (!modelStats.isFile() || modelStats.size === 0) {
+      throw new Error("model file is empty or is not a regular file");
+    }
+    return MODEL_PATH;
   } catch {
-    return FP32_MODEL_PATH;
+    throw new Error(
+      `ONNX model is missing at ${MODEL_PATH}. Run npm run download:model during the build.`,
+    );
   }
 }
 const CONFIG_PATH = path.join(MODEL_DIR, "config.json");

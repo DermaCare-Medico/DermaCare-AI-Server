@@ -11,7 +11,7 @@ const MODEL_PATH = path.join(
   ROOT,
   "model",
   "vit-skin-disease",
-  "model.onnx"
+  "model-int8.onnx"
 );
 
 const CONFIG_PATH = path.join(
