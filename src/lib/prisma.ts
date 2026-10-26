@@ -12,4 +12,15 @@ const pool = new pg.Pool({
 
 const adapter = new PrismaPg(pool);
 
-export const prisma = new PrismaClient({ adapter });
+export const prisma = new PrismaClient({
+  adapter,
+  transactionOptions: {
+    maxWait: 10_000,
+    timeout: 15_000,
+  },
+});
+
+export const closeDatabaseConnections = async (): Promise<void> => {
+  await prisma.$disconnect();
+  await pool.end();
+};
