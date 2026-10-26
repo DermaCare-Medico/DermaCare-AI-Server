@@ -20,7 +20,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "seed:screening-conditions": "tsx prisma/seeds/screening-conditions.seed.ts",
-    "seed:screening-specializations": "tsx prisma/seeds/screening-specializations.seed.ts"
+    "seed:screening-specializations": "tsx prisma/seeds/screening-specializations.seed.ts",
+    "seed:dev": "node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs prisma/seeds/dev.seed.ts"
   },
   "keywords": [
     "dermacare",
