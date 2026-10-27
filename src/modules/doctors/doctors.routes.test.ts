@@ -10,6 +10,7 @@ type RouteLayer = {
   route?: {
     path: string;
     methods: Record<string, boolean>;
+    stack: Array<{ name: string }>;
   };
 };
 
@@ -69,6 +70,49 @@ test("Doctor application and profile RBAC preserve Patient and Doctor access", (
   assert.equal(checkRole(applicants, Role.PATIENT).passed, true);
   assert.equal(checkRole(applicants, Role.DOCTOR).passed, true);
   assert.ok(checkRole(applicants, Role.ADMIN).error);
+});
+
+test("final Doctor application uses authentication plus service-level applicant authorization", () => {
+  const layer = ((doctorRoutes as unknown as { stack: RouteLayer[] }).stack)
+    .find(({ route }) => route?.path === "/application" && route.methods.post);
+
+  assert.ok(layer?.route);
+  assert.deepEqual(layer.route.stack.map(({ name }) => name), [
+    "authenticate",
+    "submitApplication",
+  ]);
+});
+
+test("Doctor document upload authenticates before file and service-level applicant checks", () => {
+  const layer = ((doctorRoutes as unknown as { stack: RouteLayer[] }).stack)
+    .find(({ route }) => route?.path === "/application/documents" && route.methods.post);
+
+  assert.ok(layer?.route);
+  assert.deepEqual(layer.route.stack.map(({ name }) => name), [
+    "authenticate",
+    "multerMiddleware",
+    "uploadApplicationDocument",
+  ]);
+});
+
+test("clinical Doctor routes retain their role-authorization middleware", () => {
+  const clinicalPaths = [
+    "/me/profile",
+    "/me/slots",
+    "/me/appointment-requests",
+    "/me/appointments",
+    "/me/medicine-requests",
+    "/me/earnings/summary",
+    "/me/earnings/history",
+    "/me/payouts",
+  ];
+  const routeLayers = ((doctorRoutes as unknown as { stack: RouteLayer[] }).stack)
+    .filter(({ route }) => route && clinicalPaths.includes(route.path));
+
+  assert.ok(routeLayers.length >= clinicalPaths.length);
+  for (const { route } of routeLayers) {
+    assert.ok(route!.stack.length >= 3, `${route!.path} must retain authenticate and authorize`);
+  }
 });
 
 test("Doctor operational routes remain Doctor-only", () => {

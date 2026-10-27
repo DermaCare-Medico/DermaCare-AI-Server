@@ -7,7 +7,8 @@ export const doctorApplicationSchema = z.object({
   experienceYears: z.number().int().min(0).max(70),
   consultationFee: z.number().min(0).max(1000000),
   bio: z.string().trim().max(2000).optional(),
-  specializationIds: z.array(z.string().uuid()).min(1).max(20),
+  specializationIds: z.array(z.string().uuid()).min(1).max(20)
+    .refine((ids) => new Set(ids).size === ids.length, "Duplicate specializations are not allowed"),
   documentReferences: z.array(
     z.string().trim().regex(/^DermaCare-AI\/doctor-documents\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)+$/),
   ).min(1).max(10),

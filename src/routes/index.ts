@@ -45,6 +45,11 @@ apiRouter.use(
   authorize(Role.PATIENT, Role.DOCTOR, Role.ADMIN),
   notificationRoutes,
 );
+
+// Mount before the unscoped patient/doctor authorization chains below.
+// Those middleware chains run even when their nested routers do not match.
+apiRouter.use("/doctors", doctorRoutes);
+
 apiRouter.use(
   authenticate,
   authorize(Role.PATIENT, Role.DOCTOR),
@@ -61,7 +66,5 @@ apiRouter.use(
 );
 
 apiRouter.use("/screenings", screeningRoutes);
-
-apiRouter.use("/doctors", doctorRoutes);
 
 export default apiRouter;
