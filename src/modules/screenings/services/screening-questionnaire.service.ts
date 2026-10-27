@@ -4,6 +4,7 @@ import { AppError } from "../../../shared/errors/AppError.js";
 
 export interface CreateScreeningPayload {
   symptoms: string;
+  bodyArea?: string;
   hasBleeding?: boolean;
   rapidGrowth?: boolean;
   hasFever?: boolean;
@@ -37,6 +38,7 @@ export async function createScreening(
     data: {
       patientId: patient.id,
       symptoms: payload.symptoms.trim(),
+      bodyArea: payload.bodyArea?.trim(),
       redFlagDetected,
       aiStatus: "PENDING",
       disclaimer: redFlagDetected
@@ -46,6 +48,7 @@ export async function createScreening(
     select: {
       id: true,
       symptoms: true,
+      bodyArea: true,
       redFlagDetected: true,
       aiStatus: true,
       disclaimer: true,
