@@ -6,7 +6,10 @@ import { authorize } from "../../middlewares/authorize.middleware.js";
 import { uploadScreeningImage } from "../../middlewares/upload.middleware.js";
 import { asyncHandler } from "../../middlewares/asyncHandler.middleware.js";
 
-import { uploadScreeningImageController } from "./controllers/screening-image.controller.js";
+import {
+  uploadScreeningImageController,
+  getScreeningImageController,
+} from "./controllers/screening-image.controller.js";
 import { createScreeningController } from "./controllers/screening-questionnaire.controller.js";
 import {
   getScreeningHistoryController,
@@ -41,6 +44,11 @@ router.get(
 router.get(
   "/history/:screeningId",
   asyncHandler(getScreeningHistoryItemController),
+);
+
+router.get(
+  "/history/:screeningId/images/:imageId",
+  asyncHandler(getScreeningImageController),
 );
 
 router.post(

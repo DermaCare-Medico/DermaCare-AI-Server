@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { authenticate } from "../middlewares/authenticate.middleware.js";
 
 type MountLayer = {
   handle: unknown;
@@ -21,4 +22,16 @@ test("Doctor router is mounted exactly once at /doctors", async () => {
   assert.equal(doctorMounts.length, 1);
   assert.match(String(doctorMounts[0]!.regexp), /\\\/doctors/);
   assert.doesNotMatch(String(doctorMounts[0]!.regexp), /api\\\/doctors/);
+
+  const doctorMountIndex = layers.indexOf(doctorMounts[0]!);
+  const firstUnscopedAuthenticationIndex = layers.findIndex(
+    (layer) => layer.handle === authenticate && !String(layer.regexp).includes("users")
+      && !String(layer.regexp).includes("notifications")
+      && !String(layer.regexp).includes("admin"),
+  );
+  assert.ok(firstUnscopedAuthenticationIndex >= 0);
+  assert.ok(
+    doctorMountIndex < firstUnscopedAuthenticationIndex,
+    "Doctor routes must be mounted before unscoped role authorization middleware",
+  );
 });

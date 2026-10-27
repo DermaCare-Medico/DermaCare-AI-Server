@@ -19,12 +19,13 @@ interface ProcessPredictionInput {
   screeningId: string;
   userId: string;
   imagePath: string;
+  alreadyClaimed?: boolean;
 }
 
 export async function processScreeningPrediction(
   input: ProcessPredictionInput,
 ) {
-  const { screeningId, userId, imagePath } = input;
+  const { screeningId, userId, imagePath, alreadyClaimed = false } = input;
 
   const screening = await prisma.screening.findFirst({
     where: {
@@ -44,21 +45,27 @@ export async function processScreeningPrediction(
     throw new AppError("Screening not found or access denied", 404);
   }
 
-  const claimed = await prisma.screening.updateMany({
-    where: {
-      id: screeningId,
-      patient: { is: { userId } },
-      aiStatus: { in: ["PENDING", "FAILED"] },
-    },
-    data: { aiStatus: "PROCESSING" },
-  });
-  if (claimed.count !== 1) {
-    throw new AppError(
-      screening.aiStatus === "COMPLETED"
-        ? "Screening has already been processed"
-        : "Screening is already processing",
-      409,
-    );
+  if (alreadyClaimed) {
+    if (screening.aiStatus !== "PROCESSING") {
+      throw new AppError("Screening processing claim was lost", 409);
+    }
+  } else {
+    const claimed = await prisma.screening.updateMany({
+      where: {
+        id: screeningId,
+        patient: { is: { userId } },
+        aiStatus: { in: ["PENDING", "FAILED"] },
+      },
+      data: { aiStatus: "PROCESSING", completedAt: null },
+    });
+    if (claimed.count !== 1) {
+      throw new AppError(
+        screening.aiStatus === "COMPLETED"
+          ? "Screening has already been processed"
+          : "Screening is already processing",
+        409,
+      );
+    }
   }
 
   try {
@@ -167,6 +174,7 @@ export async function processScreeningPrediction(
         where: { id: screeningId },
         data: {
           aiStatus: "COMPLETED",
+          completedAt: new Date(),
           disclaimer,
           riskLevel: safety.riskLevel,
           redFlagDetected: safety.redFlagDetected,
@@ -198,6 +206,10 @@ export async function processScreeningPrediction(
           (topPrediction.score * 100).toFixed(2),
         ),
       },
+      alternatives: topFive.slice(1).map((alternative) => ({
+        condition: alternative.className,
+        confidenceScore: Number((alternative.score * 100).toFixed(2)),
+      })),
     };
   } catch (error) {
     await prisma.screening
@@ -205,6 +217,7 @@ export async function processScreeningPrediction(
         where: { id: screeningId, aiStatus: "PROCESSING" },
         data: {
           aiStatus: "FAILED",
+          completedAt: null,
           ...(error instanceof UnusableScreeningImageError && {
             imageQualityStatus: "UNUSABLE",
           }),

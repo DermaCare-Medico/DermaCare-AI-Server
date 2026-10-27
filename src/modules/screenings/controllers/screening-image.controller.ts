@@ -3,7 +3,10 @@ import { unlink } from "node:fs/promises";
 import type { Request, Response, NextFunction } from "express";
 
 import { AppError } from "../../../shared/errors/AppError.js";
-import { saveScreeningImage } from "../services/screening-image.service.js";
+import {
+  saveScreeningImage,
+  getAuthorizedScreeningImageData,
+} from "../services/screening-image.service.js";
 import { processScreeningPrediction } from "../services/screening-prediction.service.js";
 import { screeningImageSchema } from "../screenings.validation.js";
 
@@ -45,6 +48,7 @@ export async function uploadScreeningImageController(
       screeningId,
       userId: req.auth.userId,
       imagePath: file.path,
+      alreadyClaimed: true,
     });
 
     return res.status(201).json({
@@ -64,5 +68,40 @@ export async function uploadScreeningImageController(
         cleanupError,
       );
     });
+  }
+}
+
+export async function getScreeningImageController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.auth) {
+      throw new AppError("Authentication required", 401);
+    }
+
+    const { screeningId, imageId } = req.params;
+
+    if (!screeningId || !imageId) {
+      throw new AppError("Screening ID and Image ID are required", 400);
+    }
+
+    const { fileBuffer } = await getAuthorizedScreeningImageData(
+      req.auth.userId,
+      screeningId,
+      imageId,
+    );
+
+    res.set({
+      "Content-Type": "image/jpeg",
+      "Cache-Control": "private, no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+    });
+
+    return res.status(200).send(fileBuffer);
+  } catch (error) {
+    return next(error);
   }
 }

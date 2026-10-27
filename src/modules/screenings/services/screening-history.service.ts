@@ -1,7 +1,11 @@
 import { prisma } from "../../../lib/prisma.js";
+import { generatePrivateImageUrl } from "../../../shared/services/cloudinary/cloudinary.service.js";
 
-export async function getScreeningHistory(userId: string) {
-  return prisma.screening.findMany({
+export async function getScreeningHistory(
+  userId: string,
+  database: Pick<typeof prisma, "screening"> = prisma,
+) {
+  const items = await database.screening.findMany({
     where: {
       patient: {
         is: { userId },
@@ -11,12 +15,14 @@ export async function getScreeningHistory(userId: string) {
     select: {
       id: true,
       symptoms: true,
+      bodyArea: true,
       imageQualityStatus: true,
       riskLevel: true,
       redFlagDetected: true,
       aiStatus: true,
       disclaimer: true,
       createdAt: true,
+      completedAt: true,
       predictions: {
         orderBy: { confidenceScore: "desc" },
         take: 1,
@@ -37,18 +43,28 @@ export async function getScreeningHistory(userId: string) {
         select: {
           id: true,
           imageType: true,
+          storageKey: true,
           createdAt: true,
         },
       },
     },
   });
+
+  return items.map((item) => ({
+    ...item,
+    images: item.images.map(({ storageKey, ...img }) => ({
+      ...img,
+      imageUrl: generatePrivateImageUrl(storageKey),
+    })),
+  }));
 }
 
 export async function getScreeningHistoryItem(
   userId: string,
   screeningId: string,
+  database: Pick<typeof prisma, "screening"> = prisma,
 ) {
-  return prisma.screening.findFirst({
+  const item = await database.screening.findFirst({
     where: {
       id: screeningId,
       patient: { is: { userId } },
@@ -56,15 +72,16 @@ export async function getScreeningHistoryItem(
     select: {
       id: true,
       symptoms: true,
+      bodyArea: true,
       imageQualityStatus: true,
       riskLevel: true,
       redFlagDetected: true,
       aiStatus: true,
       disclaimer: true,
       createdAt: true,
+      completedAt: true,
       predictions: {
         orderBy: { confidenceScore: "desc" },
-        take: 1,
         select: {
           confidenceScore: true,
           condition: {
@@ -86,9 +103,20 @@ export async function getScreeningHistoryItem(
         select: {
           id: true,
           imageType: true,
+          storageKey: true,
           createdAt: true,
         },
       },
     },
   });
+
+  if (!item) return null;
+
+  return {
+    ...item,
+    images: item.images.map(({ storageKey, ...img }) => ({
+      ...img,
+      imageUrl: generatePrivateImageUrl(storageKey),
+    })),
+  };
 }

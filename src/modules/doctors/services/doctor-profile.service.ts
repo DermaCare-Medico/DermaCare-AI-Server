@@ -2,12 +2,30 @@
 import {
   AccountStatus,
   DoctorApprovalStatus,
+  Prisma,
   Role,
 } from "../../../generated/prisma/client.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import type { DoctorApplicationInput, DoctorProfileUpdateInput } from "../doctors.validation.js";
 import { downloadPrivateImage, uploadPrivateImage } from "../../../shared/services/cloudinary/cloudinary.service.js";
+
+export const assertDoctorApplicationCanBeSubmitted = (
+  approvalStatus: DoctorApprovalStatus | null,
+) => {
+  if (approvalStatus === DoctorApprovalStatus.APPROVED) {
+    throw new AppError("Doctor application is already approved", 409);
+  }
+  if (approvalStatus === DoctorApprovalStatus.PENDING) {
+    throw new AppError("Doctor application is already pending review", 409);
+  }
+};
+
+export const assertDoctorApplicantRole = (role: Role) => {
+  if (role !== Role.USER && role !== Role.PATIENT) {
+    throw new AppError("This account cannot apply as a doctor", 403);
+  }
+};
 
 export const doctorDocumentBelongsToUser = (reference: string, userId: string) => {
   const escapedUserId = userId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -44,10 +62,11 @@ export const downloadMyDoctorDocument = async (userId: string, documentIndex: nu
 
 export const storeDoctorApplicationDocument = async (userId: string, filePath: string) => {
   const user = await prisma.user.findFirst({
-    where: { id: userId, deletedAt: null, role: { in: [Role.USER, Role.PATIENT, Role.DOCTOR] } },
-    select: { id: true },
+    where: { id: userId, deletedAt: null },
+    select: { id: true, role: true },
   });
   if (!user) throw new AppError("Doctor document owner not found", 403);
+  assertDoctorApplicantRole(user.role);
   const uploaded = await uploadPrivateImage(filePath, `DermaCare-AI/doctor-documents/${userId}`);
   return uploaded.public_id;
 };
@@ -77,17 +96,12 @@ export const submitDoctorApplication = async (
     throw new AppError("User not found", 404);
   }
 
-  if (user.role === Role.ADMIN || user.role === Role.STORE_OWNER) {
-    throw new AppError("This account cannot apply as a doctor", 403);
+  if (user.doctorProfile?.approvalStatus === DoctorApprovalStatus.APPROVED) {
+    assertDoctorApplicationCanBeSubmitted(user.doctorProfile.approvalStatus);
   }
+  assertDoctorApplicantRole(user.role);
   if (input.documentReferences.some((reference) => !doctorDocumentBelongsToUser(reference, userId))) {
     throw new AppError("Doctor document does not belong to this account", 403);
-  }
-
-  if (
-    user.doctorProfile?.approvalStatus === DoctorApprovalStatus.APPROVED
-  ) {
-    throw new AppError("Doctor application is already approved", 409);
   }
 
   const specializations = await prisma.specialization.findMany({
@@ -102,22 +116,19 @@ export const submitDoctorApplication = async (
   }
 
   const profile = await prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: userId },
-      data: { role: Role.USER },
-    });
     const existing = await tx.doctorProfile.findUnique({
       where: { userId },
-      select: { id: true },
+      select: { id: true, approvalStatus: true },
     });
 
     if (existing) {
-      await tx.doctorSpecialization.deleteMany({
-        where: { doctorId: existing.id },
-      });
+      assertDoctorApplicationCanBeSubmitted(existing.approvalStatus);
 
-      return tx.doctorProfile.update({
-        where: { userId },
+      const reset = await tx.doctorProfile.updateMany({
+        where: {
+          id: existing.id,
+          approvalStatus: DoctorApprovalStatus.REJECTED,
+        },
         data: {
           licenseNumber: input.licenseNumber,
           qualifications: input.qualifications,
@@ -129,14 +140,28 @@ export const submitDoctorApplication = async (
           approvedById: null,
           approvedAt: null,
           rejectionReason: null,
-          specializations: {
-            create: input.specializationIds.map((specializationId) => ({
-              specialization: {
-                connect: { id: specializationId },
-              },
-            })),
-          },
         },
+      });
+      if (reset.count !== 1) {
+        throw new AppError("Doctor application changed while being submitted", 409);
+      }
+
+      await tx.doctorSpecialization.deleteMany({
+        where: { doctorId: existing.id },
+      });
+      await tx.doctorSpecialization.createMany({
+        data: input.specializationIds.map((specializationId) => ({
+          doctorId: existing.id,
+          specializationId,
+        })),
+      });
+      await tx.user.update({
+        where: { id: userId },
+        data: { role: Role.USER },
+      });
+
+      return tx.doctorProfile.findUniqueOrThrow({
+        where: { id: existing.id },
         include: {
           specializations: {
             include: { specialization: true },
@@ -145,7 +170,7 @@ export const submitDoctorApplication = async (
       });
     }
 
-    return tx.doctorProfile.create({
+    const created = await tx.doctorProfile.create({
       data: {
         userId,
         licenseNumber: input.licenseNumber,
@@ -169,6 +194,16 @@ export const submitDoctorApplication = async (
         },
       },
     });
+    await tx.user.update({
+      where: { id: userId },
+      data: { role: Role.USER },
+    });
+    return created;
+  }).catch((error: unknown) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new AppError("A doctor application or license number already exists", 409);
+    }
+    throw error;
   });
 
   return {

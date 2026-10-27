@@ -10,9 +10,9 @@ let configured = false;
 export function ensureCloudinaryConfigured(): void {
   if (configured) return;
 
-  const cloudName = env.CLOUDINARY_CLOUD_NAME ?? process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = env.CLOUDINARY_API_KEY ?? process.env.CLOUDINARY_API_KEY;
-  const apiSecret = env.CLOUDINARY_API_SECRET ?? process.env.CLOUDINARY_API_SECRET;
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new AppError("Image storage is not configured", 503);
@@ -74,4 +74,19 @@ export async function downloadPrivateImage(publicId: string): Promise<Buffer> {
   const response = await fetch(url);
   if (!response.ok) throw new AppError("Stored private image is unavailable", 502);
   return Buffer.from(await response.arrayBuffer());
+}
+
+export function generatePrivateImageUrl(
+  publicId?: string | null,
+  expiresInSeconds = 3600,
+): string | undefined {
+  if (!publicId) return undefined;
+  ensureCloudinaryConfigured();
+  const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  const cleanPublicId = publicId.replace(/\.[^/.]+$/, "");
+  return cloudinary.utils.private_download_url(cleanPublicId, "jpg", {
+    resource_type: "image",
+    type: "authenticated",
+    expires_at: expiresAt,
+  });
 }

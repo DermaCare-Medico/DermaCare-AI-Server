@@ -42,7 +42,6 @@ router.get("/:doctorId", doctorController.getById);
 router.post(
   "/application/documents",
   authenticate,
-  authorize(Role.USER, Role.PATIENT, Role.DOCTOR),
   uploadScreeningImage,
   doctorController.uploadApplicationDocument,
 );
@@ -50,7 +49,6 @@ router.post(
 router.post(
   "/application",
   authenticate,
-  authorize(Role.USER, Role.PATIENT, Role.DOCTOR),
   doctorController.submitApplication,
 );
 
