@@ -40,8 +40,6 @@ test("Doctor router exposes only canonical public and role-specific routes", () 
 
   assert.deepEqual(routes, [
     { method: "GET", path: "/" },
-    { method: "GET", path: "/:doctorId/slots" },
-    { method: "GET", path: "/:doctorId" },
     { method: "POST", path: "/application/documents" },
     { method: "POST", path: "/application" },
     { method: "GET", path: "/me/application-documents/:documentIndex" },
@@ -51,6 +49,8 @@ test("Doctor router exposes only canonical public and role-specific routes", () 
     { method: "GET", path: "/me/slots" },
     { method: "PATCH", path: "/me/slots/:slotId" },
     { method: "DELETE", path: "/me/slots/:slotId" },
+    { method: "GET", path: "/:doctorId/slots" },
+    { method: "GET", path: "/:doctorId" },
     { method: "GET", path: "/me/appointment-requests" },
     { method: "GET", path: "/me/appointments" },
     { method: "PATCH", path: "/me/appointments/:appointmentId/decision" },
@@ -62,6 +62,20 @@ test("Doctor router exposes only canonical public and role-specific routes", () 
     { method: "GET", path: "/me/payouts" },
   ]);
   assert.equal(routes.some(({ path }) => path.startsWith("/admin/")), false);
+});
+
+test("Doctor-owned slot GET is registered before the public UUID slot route", () => {
+  const routes = mountedRoutes();
+  const ownSlots = routes.findIndex(
+    ({ method, path }) => method === "GET" && path === "/me/slots",
+  );
+  const publicSlots = routes.findIndex(
+    ({ method, path }) => method === "GET" && path === "/:doctorId/slots",
+  );
+
+  assert.ok(ownSlots >= 0);
+  assert.ok(publicSlots >= 0);
+  assert.ok(ownSlots < publicSlots, 'GET /me/slots must not match "/:doctorId/slots"');
 });
 
 test("Doctor application and profile RBAC preserve Patient and Doctor access", () => {

@@ -38,7 +38,15 @@ export async function createSlotController(
   req: Request,
   res: Response,
 ) {
-  const input = createDoctorSlotSchema.parse(req.body);
+  const parsedInput = createDoctorSlotSchema.safeParse(req.body);
+  if (!parsedInput.success) {
+    throw new AppError(
+      parsedInput.error.issues[0]?.message ?? "Invalid slot payload",
+      HTTP_STATUS.BAD_REQUEST,
+    );
+  }
+
+  const input = parsedInput.data;
   const slot = await createDoctorSlot(getUserId(req), input);
 
   res.status(HTTP_STATUS.CREATED).json({

@@ -16,8 +16,11 @@ import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { requestMeetingProvisioning } from "../../../integrations/google-calendar/meeting-provisioning.worker.js";
 import { createNotificationIfEligible } from "../../notifications/services/notification.service.js";
-import { isOrderPaymentExpired } from "../../orders/services/order-payment.rules.js";
-import { stripeDoctorPayoutMatches, stripePaymentMatches } from "./stripe-payment.rules.js";
+import {
+  paymentCompletedBeforeDeadline,
+  stripeDoctorPayoutMatches,
+  stripePaymentMatches,
+} from "./stripe-payment.rules.js";
 import {
   reconcileStripeRefund,
   requestStripeRefunds,
@@ -169,11 +172,32 @@ export function assertLateRefundRequestsSucceeded(failedPaymentIds: string[]) {
   }
 }
 
-async function completeAppointment(session: Stripe.Checkout.Session, paymentId: string) {
+type VerifiedStripePayment = { paymentIntentId: string; paidAt: Date };
+
+async function verifyStripePaymentIntent(
+  session: Stripe.Checkout.Session,
+): Promise<VerifiedStripePayment> {
   const paymentIntentId = typeof session.payment_intent === "string"
     ? session.payment_intent
     : session.payment_intent?.id;
   if (!paymentIntentId) throw new AppError("Stripe PaymentIntent reference is missing", 400);
+
+  const paymentIntent = await stripe().paymentIntents.retrieve(paymentIntentId);
+  if (paymentIntent.status !== "succeeded"
+    || paymentIntent.amount_received !== session.amount_total
+    || paymentIntent.currency !== session.currency) {
+    throw new AppError("Stripe PaymentIntent does not match the checkout session", 400);
+  }
+
+  return { paymentIntentId, paidAt: new Date(paymentIntent.created * 1000) };
+}
+
+async function completeAppointment(
+  session: Stripe.Checkout.Session,
+  paymentId: string,
+  verifiedPayment: VerifiedStripePayment,
+) {
+  const { paymentIntentId, paidAt } = verifiedPayment;
   const result = await prisma.$transaction(async (tx) => {
     const payment = await tx.paymentTransaction.findUnique({
       where: { id: paymentId },
@@ -198,21 +222,20 @@ async function completeAppointment(session: Stripe.Checkout.Session, paymentId: 
       || !stripePaymentMatches(payment.amount, payment.currency, session.amount_total, session.currency)) {
       throw new AppError("Stripe payment details do not match the appointment", 400);
     }
+    if (payment.status === TransactionStatus.PAID) {
+      if (payment.stripePaymentIntentId && payment.stripePaymentIntentId !== paymentIntentId) {
+        throw new AppError("Stripe PaymentIntent does not match the recorded payment", 400);
+      }
+      return { completed: false, refundPaymentIds: [] as string[] };
+    }
     if (payment.appointment.status !== AppointmentStatus.PENDING
-      || (payment.appointment.holdExpiresAt && payment.appointment.holdExpiresAt <= new Date())) {
+      || !paymentCompletedBeforeDeadline(paidAt, payment.appointment.holdExpiresAt)) {
       const refundPaymentIds = await stageCapturedStripePaymentForRefund(
         tx,
         payment,
         paymentIntentId,
       );
       return { completed: false, refundPaymentIds };
-    }
-
-    if (payment.status === TransactionStatus.PAID) {
-      if (payment.stripePaymentIntentId && payment.stripePaymentIntentId !== paymentIntentId) {
-        throw new AppError("Stripe PaymentIntent does not match the recorded payment", 400);
-      }
-      return { completed: false, refundPaymentIds: [] as string[] };
     }
     if (payment.status !== TransactionStatus.PENDING
       && payment.status !== TransactionStatus.FAILED) {
@@ -226,7 +249,7 @@ async function completeAppointment(session: Stripe.Checkout.Session, paymentId: 
       },
       data: {
         status: TransactionStatus.PAID,
-        paidAt: new Date(),
+        paidAt,
         stripePaymentIntentId: paymentIntentId,
       },
     });
@@ -283,11 +306,12 @@ async function completeAppointment(session: Stripe.Checkout.Session, paymentId: 
   if (result.completed) requestMeetingProvisioning();
 }
 
-async function completeOrder(session: Stripe.Checkout.Session, paymentId: string) {
-  const paymentIntentId = typeof session.payment_intent === "string"
-    ? session.payment_intent
-    : session.payment_intent?.id;
-  if (!paymentIntentId) throw new AppError("Stripe PaymentIntent reference is missing", 400);
+async function completeOrder(
+  session: Stripe.Checkout.Session,
+  paymentId: string,
+  verifiedPayment: VerifiedStripePayment,
+) {
+  const { paymentIntentId, paidAt } = verifiedPayment;
   const result = await prisma.$transaction(async (tx) => {
     const payment = await tx.paymentTransaction.findUnique({
       where: { id: paymentId },
@@ -307,19 +331,20 @@ async function completeOrder(session: Stripe.Checkout.Session, paymentId: string
       || !stripePaymentMatches(payment.amount, payment.currency, session.amount_total, session.currency)) {
       throw new AppError("Stripe payment details do not match the order", 400);
     }
-    if (payment.order.status !== OrderStatus.PENDING || isOrderPaymentExpired(payment.order.paymentExpiresAt)) {
+    if (payment.status === TransactionStatus.PAID) {
+      if (payment.stripePaymentIntentId && payment.stripePaymentIntentId !== paymentIntentId) {
+        throw new AppError("Stripe PaymentIntent does not match the recorded payment", 400);
+      }
+      return { refundPaymentIds: [] as string[] };
+    }
+    if (payment.order.status !== OrderStatus.PENDING
+      || !paymentCompletedBeforeDeadline(paidAt, payment.order.paymentExpiresAt)) {
       const refundPaymentIds = await stageCapturedStripePaymentForRefund(
         tx,
         payment,
         paymentIntentId,
       );
       return { refundPaymentIds };
-    }
-    if (payment.status === TransactionStatus.PAID) {
-      if (payment.stripePaymentIntentId && payment.stripePaymentIntentId !== paymentIntentId) {
-        throw new AppError("Stripe PaymentIntent does not match the recorded payment", 400);
-      }
-      return { refundPaymentIds: [] as string[] };
     }
     if (payment.status !== TransactionStatus.PENDING
       && payment.status !== TransactionStatus.FAILED) {
@@ -332,7 +357,7 @@ async function completeOrder(session: Stripe.Checkout.Session, paymentId: string
       },
       data: {
         status: TransactionStatus.PAID,
-        paidAt: new Date(),
+        paidAt,
         stripePaymentIntentId: paymentIntentId,
       },
     });
@@ -435,10 +460,11 @@ async function handlePaidSession(session: Stripe.Checkout.Session) {
   }
 
   if (!payment) throw new AppError("Stripe checkout session is not registered", 400);
+  const verifiedPayment = await verifyStripePaymentIntent(session);
   if (payment.purpose === TransactionPurpose.APPOINTMENT) {
-    await completeAppointment(session, payment.id);
+    await completeAppointment(session, payment.id, verifiedPayment);
   } else if (payment.purpose === TransactionPurpose.MEDICINE_ORDER) {
-    await completeOrder(session, payment.id);
+    await completeOrder(session, payment.id, verifiedPayment);
   }
 }
 

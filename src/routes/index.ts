@@ -16,6 +16,7 @@ import prescriptionRoutes from "../modules/prescriptions/prescriptions.routes.js
 import conversationRoutes from "../modules/conversations/conversations.routes.js";
 
 import screeningRoutes from "../modules/screenings/screenings.routes.js";
+import specializationRoutes from "../modules/specializations/specializations.routes.js";
 
 // Every module router is mounted here, so app.ts never changes when a module is added
 const apiRouter = Router();
@@ -27,6 +28,7 @@ apiRouter.get("/health", (_req, res) => {
 
 apiRouter.use("/auth", authRoutes);
 apiRouter.use("/medicines", storeRoutes);
+apiRouter.use("/specializations", specializationRoutes);
 apiRouter.use(
   "/admin",
   authenticate,

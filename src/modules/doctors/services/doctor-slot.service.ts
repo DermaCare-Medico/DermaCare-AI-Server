@@ -40,13 +40,12 @@ export async function createDoctorSlot(
   const doctor = await getDoctorProfile(userId);
 
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctor.id}, 0))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctor.id}, 0))`;
     const overlappingSlot = await tx.doctorSlot.findFirst({
       where: {
         doctorId: doctor.id,
         startTime: { lt: input.endTime },
         endTime: { gt: input.startTime },
-        status: { not: SlotStatus.UNAVAILABLE },
       },
       select: { id: true },
     });
@@ -98,7 +97,7 @@ export async function updateDoctorSlot(
   const doctor = await getDoctorProfile(userId);
 
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctor.id}, 0))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctor.id}, 0))`;
     const slot = await tx.doctorSlot.findFirst({
       where: { id: slotId, doctorId: doctor.id },
       select: { id: true },
@@ -124,7 +123,7 @@ export async function deleteDoctorSlot(userId: string, slotId: string) {
   const doctor = await getDoctorProfile(userId);
 
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctor.id}, 0))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${doctor.id}, 0))`;
     const slot = await tx.doctorSlot.findFirst({
       where: { id: slotId, doctorId: doctor.id },
       select: { id: true },

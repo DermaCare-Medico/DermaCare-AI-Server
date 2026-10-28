@@ -24,7 +24,13 @@ export const buildCheckoutRedirects = (
   cancel.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
   cancel.searchParams.set("context", context);
   cancel.searchParams.set(`${context}Id`, entityId);
-  return { successUrl: success.toString(), cancelUrl: cancel.toString() };
+  const preserveStripePlaceholder = (url: URL) => url.toString()
+    .replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}");
+
+  return {
+    successUrl: preserveStripePlaceholder(success),
+    cancelUrl: preserveStripePlaceholder(cancel),
+  };
 };
 
 export const stripePaymentMatches = (
@@ -34,6 +40,11 @@ export const stripePaymentMatches = (
   currency: string | null,
 ) => amountTotal === toStripeMinorUnits(expectedAmount)
   && currency?.toUpperCase() === expectedCurrency.toUpperCase();
+
+export const paymentCompletedBeforeDeadline = (
+  paidAt: Date,
+  deadline: Date | null,
+) => !deadline || paidAt <= deadline;
 
 export const doctorPayoutCheckoutIdempotencyKey = (payoutId: string, priorSessionId?: string | null) =>
   `doctor-payout-checkout-${payoutId}-${priorSessionId ?? "initial"}`;
