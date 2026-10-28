@@ -48,6 +48,20 @@ const itemData = (item: PrescriptionItemInput) => ({
   instructions: item.instructions,
 });
 
+async function ensureMedicineIdsExist(
+  tx: Prisma.TransactionClient,
+  items: PrescriptionItemInput[],
+) {
+  const medicineIds = [...new Set(items.flatMap((item) =>
+    item.medicineId ? [item.medicineId] : []))];
+  if (medicineIds.length === 0) return;
+
+  const count = await tx.medicine.count({ where: { id: { in: medicineIds } } });
+  if (count !== medicineIds.length) {
+    throw new AppError("One or more medicine IDs are invalid", 400);
+  }
+}
+
 export async function createPrescription(
   userId: string,
   appointmentId: string,
@@ -71,6 +85,7 @@ export async function createPrescription(
         where: { id: appointment.prescription.id }, select: prescriptionSelect,
       });
     }
+    await ensureMedicineIdsExist(tx, input.items);
     return tx.prescription.create({
       data: {
         appointmentId,
@@ -128,6 +143,7 @@ export async function replacePrescriptionItems(
       where: { id: prescriptionId, doctorId: doctor.id, sentAt: null }, select: { id: true },
     });
     if (!claimed) throw new AppError("Sent prescriptions cannot be modified", 409);
+    await ensureMedicineIdsExist(tx, items);
     await tx.prescriptionItem.deleteMany({ where: { prescriptionId } });
     await tx.prescriptionItem.createMany({
       data: items.map((item) => ({ prescriptionId, ...itemData(item) })),

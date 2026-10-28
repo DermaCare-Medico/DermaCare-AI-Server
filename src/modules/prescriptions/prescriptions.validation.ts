@@ -3,14 +3,26 @@ import { z } from "zod";
 export const prescriptionIdSchema = z.object({ id: z.string().uuid() });
 export const appointmentPrescriptionIdSchema = z.object({ id: z.string().uuid() });
 
+const prescriptionDurationSchema = z.union([
+  z.string().trim().min(1).max(100),
+  z.number().int().positive().transform(String),
+]);
+
 export const prescriptionItemSchema = z.object({
   medicineId: z.string().uuid().optional(),
   medicineName: z.string().trim().min(1).max(255),
   dosage: z.string().trim().min(1).max(100),
   frequency: z.string().trim().min(1).max(100),
-  duration: z.union([z.string().trim().min(1).max(100), z.number().int().positive().transform(String)]),
+  duration: prescriptionDurationSchema.optional(),
+  durationDays: z.number().int().positive().optional(),
   instructions: z.string().trim().max(2000).optional(),
-});
+}).refine((item) => item.duration !== undefined || item.durationDays !== undefined, {
+  message: "Duration is required",
+  path: ["duration"],
+}).transform(({ durationDays, ...item }) => ({
+  ...item,
+  duration: item.duration ?? String(durationDays),
+}));
 
 export const createPrescriptionSchema = z.object({
   findings: z.string().trim().max(5000).optional(),

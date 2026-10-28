@@ -32,11 +32,6 @@ const router = Router();
 
 // Public: approved doctors only
 router.get("/", doctorController.list);
-router.get(
-  "/:doctorId/slots",
-  asyncHandler(getAvailableSlotsController),
-);
-router.get("/:doctorId", doctorController.getById);
 
 // Authenticated user: apply and view own application
 router.post(
@@ -101,6 +96,14 @@ router.delete(
   authorize(Role.DOCTOR),
   asyncHandler(deleteSlotController),
 );
+
+// Keep parameterized public routes after every /me route so "me" is not
+// interpreted as a doctor UUID.
+router.get(
+  "/:doctorId/slots",
+  asyncHandler(getAvailableSlotsController),
+);
+router.get("/:doctorId", doctorController.getById);
 
 // Doctor appointment requests
 router.get(

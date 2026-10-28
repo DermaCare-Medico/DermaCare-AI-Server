@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { z } from "zod";
 import { AppError } from "../../shared/errors/AppError.js";
 import { Role } from "../../generated/prisma/client.js";
 import {
@@ -24,41 +25,50 @@ const userId = (req: Request) => {
   return req.auth.userId;
 };
 
+const parseRequest = <T>(schema: z.ZodType<T>, value: unknown): T => {
+  const parsed = schema.safeParse(value);
+  if (parsed.success) return parsed.data;
+
+  const issue = parsed.error.issues[0];
+  const path = issue?.path.length ? `${issue.path.join(".")}: ` : "";
+  throw new AppError(`${path}${issue?.message ?? "Invalid request"}`, 400);
+};
+
 export const prescriptionController = {
   create: async (req: Request, res: Response) => {
-    const { id } = appointmentPrescriptionIdSchema.parse(req.params);
-    const input = createPrescriptionSchema.parse(req.body);
+    const { id } = parseRequest(appointmentPrescriptionIdSchema, req.params);
+    const input = parseRequest(createPrescriptionSchema, req.body);
     const data = await createPrescription(userId(req), id, input);
     res.status(201).json({ success: true, data });
   },
   update: async (req: Request, res: Response) => {
-    const { id } = prescriptionIdSchema.parse(req.params);
-    const data = await updatePrescription(userId(req), id, updatePrescriptionSchema.parse(req.body));
+    const { id } = parseRequest(prescriptionIdSchema, req.params);
+    const data = await updatePrescription(userId(req), id, parseRequest(updatePrescriptionSchema, req.body));
     res.status(200).json({ success: true, data });
   },
   replaceItems: async (req: Request, res: Response) => {
-    const { id } = prescriptionIdSchema.parse(req.params);
-    const { items } = replacePrescriptionItemsSchema.parse(req.body);
+    const { id } = parseRequest(prescriptionIdSchema, req.params);
+    const { items } = parseRequest(replacePrescriptionItemsSchema, req.body);
     const data = await replacePrescriptionItems(userId(req), id, items);
     res.status(200).json({ success: true, data });
   },
   send: async (req: Request, res: Response) => {
-    const { id } = prescriptionIdSchema.parse(req.params);
+    const { id } = parseRequest(prescriptionIdSchema, req.params);
     const data = await sendPrescription(userId(req), id);
     res.status(200).json({ success: true, message: "Prescription sent successfully", data });
   },
   listMine: async (req: Request, res: Response) => {
-    const { page, limit } = prescriptionListSchema.parse(req.query);
+    const { page, limit } = parseRequest(prescriptionListSchema, req.query);
     const data = await listPatientPrescriptions(userId(req), page, limit);
     res.status(200).json({ success: true, data: data.prescriptions, pagination: data.pagination });
   },
   getMine: async (req: Request, res: Response) => {
-    const { id } = prescriptionIdSchema.parse(req.params);
+    const { id } = parseRequest(prescriptionIdSchema, req.params);
     const data = await getPatientPrescription(userId(req), id);
     res.status(200).json({ success: true, data });
   },
   list: async (req: Request, res: Response) => {
-    const { page, limit } = prescriptionListSchema.parse(req.query);
+    const { page, limit } = parseRequest(prescriptionListSchema, req.query);
     const role = req.auth?.role;
     if (role === Role.DOCTOR) {
       const data = await listDoctorPrescriptions(userId(req), page, limit);
