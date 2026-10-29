@@ -6,9 +6,12 @@ import {
     getOrderPaymentExpiry,
     isOrderPaymentExpired,
     isMatchingOrderPayment,
+    getOrderAmounts,
+    ORDER_SHIPPING_AMOUNT,
     ORDER_PAYMENT_WINDOW_MS,
 } from "./order-payment.rules.js";
 import { OrderStatus } from "../../../generated/prisma/enums.js";
+import { Prisma } from "../../../generated/prisma/client.js";
 import { getAllowedOrderTransitions } from "./order-status.rules.js";
 
 test("order payment expires exactly 30 minutes after creation", () => {
@@ -26,6 +29,19 @@ test("order payment requires the exact amount and BDT currency", () => {
     assert.equal(isMatchingOrderPayment(amount, 1250.5, "BDT"), true);
     assert.equal(isMatchingOrderPayment(amount, 1250.49, "BDT"), false);
     assert.equal(isMatchingOrderPayment(amount, 1250.5, "USD"), false);
+});
+
+test("order totals preserve item subtotal and shipping snapshots", () => {
+    const current = getOrderAmounts(new Prisma.Decimal("685"), [
+        { subtotal: new Prisma.Decimal("680") },
+    ]);
+    assert.equal(current.subtotal.toString(), "680");
+    assert.equal(current.shipping.toString(), ORDER_SHIPPING_AMOUNT.toString());
+
+    const historical = getOrderAmounts(new Prisma.Decimal("680"), [
+        { subtotal: new Prisma.Decimal("680") },
+    ]);
+    assert.equal(historical.shipping.toString(), "0");
 });
 
 test("a guarded pending-order claim has exactly one winner", async () => {

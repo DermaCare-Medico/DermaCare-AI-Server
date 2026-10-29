@@ -19,6 +19,7 @@ import { createNotificationIfEligible } from "../../notifications/services/notif
 import {
   paymentCompletedBeforeDeadline,
   stripeDoctorPayoutMatches,
+  stripeOrderPaymentMatches,
   stripePaymentMatches,
 } from "./stripe-payment.rules.js";
 import {
@@ -55,6 +56,52 @@ async function markUnsuccessful(session: Stripe.Checkout.Session) {
       },
       data: { status: PayoutStatus.PENDING },
     });
+    return;
+  }
+  if (session.metadata?.context === "order") {
+    await prisma.$transaction(async (tx) => {
+      const payment = await tx.paymentTransaction.findUnique({
+        where: { providerTransactionId: session.id },
+        select: {
+          id: true,
+          status: true,
+          order: {
+            select: {
+              id: true,
+              status: true,
+              items: { select: { inventoryId: true, quantity: true } },
+            },
+          },
+        },
+      });
+      if (!payment) return;
+
+      await tx.paymentTransaction.updateMany({
+        where: { id: payment.id, status: TransactionStatus.PENDING },
+        data: { status: TransactionStatus.FAILED },
+      });
+      if (!payment.order || payment.order.status !== OrderStatus.PENDING) return;
+
+      const cancelled = await tx.order.updateMany({
+        where: { id: payment.order.id, status: OrderStatus.PENDING },
+        data: { status: OrderStatus.CANCELLED },
+      });
+      if (cancelled.count !== 1) return;
+
+      const reservedByInventory = new Map<string, number>();
+      for (const item of payment.order.items) {
+        reservedByInventory.set(
+          item.inventoryId,
+          (reservedByInventory.get(item.inventoryId) ?? 0) + item.quantity,
+        );
+      }
+      for (const [inventoryId, quantity] of reservedByInventory) {
+        await tx.storeInventory.update({
+          where: { id: inventoryId },
+          data: { stockQuantity: { increment: quantity } },
+        });
+      }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     return;
   }
   await prisma.paymentTransaction.updateMany({
@@ -323,12 +370,19 @@ async function completeOrder(
       },
     });
     if (!payment?.order || !payment.orderId) throw new AppError("Invalid order payment", 400);
-    if (session.metadata?.context !== "order"
-      || session.metadata.entityId !== payment.orderId
-      || session.metadata.patientId !== payment.patientId
-      || payment.order.patientId !== payment.patientId
-      || !payment.amount.equals(payment.order.totalAmount)
-      || !stripePaymentMatches(payment.amount, payment.currency, session.amount_total, session.currency)) {
+    if (!stripeOrderPaymentMatches(payment.order, {
+      orderId: payment.orderId,
+      patientId: payment.patientId,
+      amount: payment.amount,
+      currency: payment.currency,
+    }, {
+      context: session.metadata?.context,
+      entityId: session.metadata?.entityId,
+      patientId: session.metadata?.patientId,
+      clientReferenceId: session.client_reference_id,
+      amountTotal: session.amount_total,
+      currency: session.currency,
+    })) {
       throw new AppError("Stripe payment details do not match the order", 400);
     }
     if (payment.status === TransactionStatus.PAID) {
@@ -367,7 +421,7 @@ async function completeOrder(
         id: payment.order.id,
         patientId: payment.patientId,
         status: OrderStatus.PENDING,
-        paymentExpiresAt: { gt: new Date() },
+        paymentExpiresAt: { gte: paidAt },
         payments: { none: { purpose: TransactionPurpose.MEDICINE_ORDER, status: TransactionStatus.PAID, id: { not: payment.id } } },
       },
       data: { status: OrderStatus.CONFIRMED },

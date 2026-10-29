@@ -4,8 +4,10 @@ import test from "node:test";
 import { Prisma } from "../../../generated/prisma/client.js";
 import {
   buildCheckoutRedirects,
+  buildOrderCheckoutRedirects,
   paymentCompletedBeforeDeadline,
   stripePaymentMatches,
+  stripeOrderPaymentMatches,
   toStripeMinorUnits,
 } from "./stripe-payment.rules.js";
 
@@ -22,11 +24,16 @@ test("appointment checkout redirects carry session and appointment context", () 
 });
 
 test("order checkout redirects carry session and order context", () => {
-  const redirects = buildCheckoutRedirects("https://client.example/app", "order", "order-id");
+  const redirects = buildOrderCheckoutRedirects("https://client.example/app", "order-id");
   const success = new URL(redirects.successUrl);
   const cancel = new URL(redirects.cancelUrl);
+  assert.equal(success.pathname, "/patient/orders/order-id");
+  assert.equal(success.searchParams.get("payment"), "success");
+  assert.equal(success.searchParams.get("context"), "order");
   assert.equal(success.searchParams.get("session_id"), "{CHECKOUT_SESSION_ID}");
   assert.equal(success.searchParams.get("orderId"), "order-id");
+  assert.equal(cancel.pathname, "/patient/orders/order-id");
+  assert.equal(cancel.searchParams.get("payment"), "cancelled");
   assert.equal(cancel.searchParams.get("orderId"), "order-id");
   assert.match(redirects.successUrl, /session_id=\{CHECKOUT_SESSION_ID\}/);
 });
@@ -37,6 +44,22 @@ test("Stripe amount and currency must exactly match server values", () => {
   assert.equal(stripePaymentMatches(amount, "BDT", 50025, "bdt"), true);
   assert.equal(stripePaymentMatches(amount, "BDT", 50024, "bdt"), false);
   assert.equal(stripePaymentMatches(amount, "BDT", 50025, "usd"), false);
+});
+
+test("order payment requires exact order ownership, reference, amount and currency", () => {
+  const order = { id: "order-a", patientId: "patient-a", totalAmount: new Prisma.Decimal("680") };
+  const payment = {
+    orderId: "order-a", patientId: "patient-a", amount: new Prisma.Decimal("680"), currency: "BDT",
+  };
+  const checkout = {
+    context: "order", entityId: "order-a", patientId: "patient-a",
+    clientReferenceId: "order-a", amountTotal: 68000, currency: "bdt",
+  };
+  assert.equal(stripeOrderPaymentMatches(order, payment, checkout), true);
+  assert.equal(stripeOrderPaymentMatches(order, payment, { ...checkout, amountTotal: 67999 }), false);
+  assert.equal(stripeOrderPaymentMatches(order, payment, { ...checkout, patientId: "patient-b" }), false);
+  assert.equal(stripeOrderPaymentMatches(order, payment, { ...checkout, entityId: "order-b" }), false);
+  assert.equal(stripeOrderPaymentMatches(order, payment, { ...checkout, clientReferenceId: "order-b" }), false);
 });
 
 test("payment completion is evaluated at Stripe capture time, not delayed webhook time", () => {

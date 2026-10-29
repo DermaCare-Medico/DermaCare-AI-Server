@@ -15,6 +15,8 @@ orderRouter.post(
     validateCreateOrder,
     asyncHandler(orderController.createOrder),
 );
+
+// Standard /patients/me/orders
 orderRouter.get(
     "/patients/me/orders",
     validatePatientOrderList,
@@ -22,6 +24,18 @@ orderRouter.get(
 );
 orderRouter.get(
     "/patients/me/orders/:id",
+    validatePatientOrderId,
+    asyncHandler(orderController.getMyOrder),
+);
+
+// Standard /orders list or ?id= detail endpoint
+orderRouter.get(
+    "/orders",
+    validatePatientOrderList,
+    asyncHandler(orderController.listMyOrders),
+);
+orderRouter.get(
+    "/orders/:id",
     validatePatientOrderId,
     asyncHandler(orderController.getMyOrder),
 );

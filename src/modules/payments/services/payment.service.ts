@@ -18,6 +18,7 @@ import { HTTP_STATUS } from "../../../shared/constants/http-status.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import type { OrderPaymentInput } from "../payments.validation.js";
 import {
+    getOrderAmounts,
     isMatchingOrderPayment,
     isOrderPaymentExpired,
 } from "../../orders/services/order-payment.rules.js";
@@ -382,6 +383,7 @@ const getOrderPayment = async (userId: string, orderId: string) => {
             status: true,
             totalAmount: true,
             paymentExpiresAt: true,
+            items: { select: { subtotal: true } },
             payments: {
                 where: { purpose: TransactionPurpose.MEDICINE_ORDER },
                 orderBy: { createdAt: "desc" },
@@ -402,10 +404,13 @@ const getOrderPayment = async (userId: string, orderId: string) => {
     });
     if (!order) throw new AppError("Order not found", HTTP_STATUS.NOT_FOUND);
     const payment = order.payments[0] ?? null;
+    const amounts = getOrderAmounts(order.totalAmount, order.items);
     return {
         orderId: order.id,
         orderStatus: order.status,
         totalAmount: order.totalAmount,
+        subtotal: amounts.subtotal,
+        shipping: amounts.shipping,
         paymentExpiresAt: order.paymentExpiresAt,
         isExpired: order.status === OrderStatus.PENDING
             && isOrderPaymentExpired(order.paymentExpiresAt),

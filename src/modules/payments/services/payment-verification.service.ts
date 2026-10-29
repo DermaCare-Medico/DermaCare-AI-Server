@@ -14,7 +14,12 @@ import { env } from "../../../config/env.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { isOrderPaymentExpired } from "../../orders/services/order-payment.rules.js";
-import { buildCheckoutRedirects, toStripeMinorUnits } from "./stripe-payment.rules.js";
+import { getOrderAmounts } from "../../orders/services/order-payment.rules.js";
+import {
+  buildCheckoutRedirects,
+  buildOrderCheckoutRedirects,
+  toStripeMinorUnits,
+} from "./stripe-payment.rules.js";
 
 let stripeClient: Stripe | undefined;
 
@@ -173,6 +178,7 @@ export async function createOrderCheckout(userId: string, orderId: string) {
     where: { id: orderId, patientId: patient.id },
     select: {
       id: true, status: true, totalAmount: true, paymentExpiresAt: true,
+      items: { select: { medicineName: true, quantity: true, unitPrice: true, subtotal: true } },
       payments: {
         where: { purpose: TransactionPurpose.MEDICINE_ORDER, status: TransactionStatus.PAID },
         select: { id: true }, take: 1,
@@ -195,21 +201,33 @@ export async function createOrderCheckout(userId: string, orderId: string) {
     where: { orderId: order.id, purpose: TransactionPurpose.MEDICINE_ORDER, provider: "STRIPE" },
   });
 
-  const redirects = buildCheckoutRedirects(env.CLIENT_URL, "order", order.id);
+  const redirects = buildOrderCheckoutRedirects(env.CLIENT_URL, order.id);
+  const amounts = getOrderAmounts(order.totalAmount, order.items);
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = order.items.map((item) => ({
+    quantity: item.quantity,
+    price_data: {
+      currency: "bdt",
+      unit_amount: toStripeMinorUnits(item.unitPrice),
+      product_data: { name: item.medicineName },
+    },
+  }));
+  if (amounts.shipping.greaterThan(0)) {
+    lineItems.push({
+      quantity: 1,
+      price_data: {
+        currency: "bdt",
+        unit_amount: toStripeMinorUnits(amounts.shipping),
+        product_data: { name: "Shipping" },
+      },
+    });
+  }
   const session = await stripe().checkout.sessions.create({
     mode: "payment",
     success_url: redirects.successUrl,
     cancel_url: redirects.cancelUrl,
     client_reference_id: order.id,
     metadata: { context: "order", entityId: order.id, patientId: patient.id },
-    line_items: [{
-      quantity: 1,
-      price_data: {
-        currency: "bdt",
-        unit_amount: toStripeMinorUnits(order.totalAmount),
-        product_data: { name: "Medicine order" },
-      },
-    }],
+    line_items: lineItems,
   }, { idempotencyKey: `order-checkout-${order.id}-${attempt}` });
   if (!session.url) throw new AppError("Stripe did not return a checkout URL", 502);
   await persistPendingPayment({

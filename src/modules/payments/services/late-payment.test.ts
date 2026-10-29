@@ -23,13 +23,19 @@ const transaction = (initialStatus: TransactionStatus) => {
         return { count: 1 };
       },
       findMany: async () => status === TransactionStatus.PAID
-        ? [{ id: "payment-id", provider: "STRIPE", refundStatus: null }]
+        ? [{
+          id: "payment-id",
+          provider: "STRIPE",
+          refundStatus: null,
+          patient: { userId: "patient-user-id" },
+        }]
         : [],
       update: async ({ data }: { data: Record<string, unknown> }) => {
         updates.push(data);
         return { id: "payment-id" };
       },
     },
+    auditLog: { create: async () => ({ id: "audit-id" }) },
   } as unknown as Prisma.TransactionClient;
   return { tx, updates, status: () => status };
 };

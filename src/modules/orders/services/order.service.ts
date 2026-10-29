@@ -20,6 +20,8 @@ import type {
 import {
     aggregateInventoryQuantities,
     getOrderPaymentExpiry,
+    getOrderAmounts,
+    ORDER_SHIPPING_AMOUNT,
 } from "./order-payment.rules.js";
 import { getAllowedOrderTransitions } from "./order-status.rules.js";
 import {
@@ -28,6 +30,10 @@ import {
 } from "../../notifications/services/notification.service.js";
 import { requestStripeRefundsWithResult, stagePaymentRefunds } from "../../payments/services/stripe-refund.service.js";
 import { expireStripeCheckoutSessions } from "../../payments/services/payment-verification.service.js";
+import { cartService } from "../../stores/services/cart.service.js";
+
+const idempotencyCache = new Map<string, { order: any; expiresAt: number }>();
+const IDEMPOTENCY_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
 const getActivePatient = async (userId: string) => {
     const user = await prisma.user.findFirst({
@@ -44,12 +50,47 @@ const getActivePatient = async (userId: string) => {
     return user.patientProfile;
 };
 
-const createOrder = async (userId: string, input: CreateOrderInput) => {
+const createOrder = async (userId: string, input: CreateOrderInput, idempotencyKey?: string) => {
     const patient = await getActivePatient(userId);
 
+    if (idempotencyKey) {
+        const cacheKey = `${patient.id}:${idempotencyKey}`;
+        const cached = idempotencyCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+            return cached.order;
+        }
+    }
+
+    let itemsToProcess = input.items;
+    let singlePrescriptionId = input.prescriptionId;
+
+    if (input.fromCart || !itemsToProcess || itemsToProcess.length === 0) {
+        const cart = await cartService.getPatientCart(userId);
+        if (!cart.eligibleForCheckout || cart.items.length === 0) {
+            throw new AppError("Cart is empty or contains ineligible items", 400);
+        }
+        itemsToProcess = cart.items.map((it) => ({
+            medicineId: it.medicineId,
+            quantity: it.quantity,
+        }));
+        if (!singlePrescriptionId) {
+            const rxItem = cart.items.find((it) => it.prescriptionId);
+            if (rxItem && rxItem.prescriptionId) singlePrescriptionId = rxItem.prescriptionId;
+        }
+    }
+
+    const resolvedAddress = input.deliveryAddress
+        || (input.shippingAddress
+            ? `${input.shippingAddress.street}, ${input.shippingAddress.city}, ${input.shippingAddress.state} ${input.shippingAddress.postalCode}, ${input.shippingAddress.country}`
+            : "");
+
+    if (!resolvedAddress || resolvedAddress.length < 5) {
+        throw new AppError("A valid delivery address is required", 400);
+    }
+
     try {
-        return await prisma.$transaction(async (tx) => {
-            const medicineIds = input.items.map((item) => item.medicineId);
+        const order = await prisma.$transaction(async (tx) => {
+            const medicineIds = itemsToProcess!.map((item) => item.medicineId);
             const inventories = await tx.storeInventory.findMany({
                 where: {
                     medicineId: { in: medicineIds },
@@ -71,32 +112,32 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                 },
             });
 
-            if (inventories.length !== input.items.length) {
+            if (inventories.length !== itemsToProcess!.length) {
                 throw new AppError("One or more medicines are unavailable", 400);
             }
 
             const inventoryByMedicine = new Map(
                 inventories.map((inventory) => [inventory.medicineId, inventory]),
             );
-            const prescription = input.prescriptionId
-                ? await tx.prescription.findFirst({
-                    where: {
-                        id: input.prescriptionId,
-                        sentAt: { not: null },
-                        appointment: { patientId: patient.id },
-                    },
-                    select: { items: { select: { medicineId: true } } },
-                })
-                : null;
 
-            if (input.prescriptionId && !prescription) {
-                throw new AppError("Prescription not found", 404);
+            // Fetch any finalized prescription authored for this patient
+            const prescriptions = await tx.prescription.findMany({
+                where: {
+                    sentAt: { not: null },
+                    appointment: { patientId: patient.id },
+                    ...(singlePrescriptionId && { id: singlePrescriptionId }),
+                },
+                select: { id: true, items: { select: { medicineId: true } } },
+            });
+
+            const prescribedMedicineIds = new Set<string>();
+            for (const rx of prescriptions) {
+                for (const item of rx.items) {
+                    if (item.medicineId) prescribedMedicineIds.add(item.medicineId);
+                }
             }
-            const prescribedMedicineIds = new Set(
-                prescription?.items.map((item) => item.medicineId) ?? [],
-            );
 
-            const orderItems = input.items.map((item) => {
+            const orderItems = itemsToProcess!.map((item) => {
                 const inventory = inventoryByMedicine.get(item.medicineId)!;
                 if (
                     inventory.medicine.requiresPrescription
@@ -135,17 +176,18 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                 }
             }
 
-            const totalAmount = orderItems.reduce(
+            const subtotalAmount = orderItems.reduce(
                 (total, item) => total.add(item.subtotal),
                 new Prisma.Decimal(0),
             );
+            const totalAmount = subtotalAmount.add(ORDER_SHIPPING_AMOUNT);
             const paymentExpiresAt = getOrderPaymentExpiry();
 
-            const order = await tx.order.create({
+            const createdOrder = await tx.order.create({
                 data: {
                     patientId: patient.id,
-                    prescriptionId: input.prescriptionId,
-                    deliveryAddress: input.deliveryAddress,
+                    prescriptionId: singlePrescriptionId || (prescriptions[0]?.id ?? null),
+                    deliveryAddress: resolvedAddress,
                     totalAmount,
                     paymentExpiresAt,
                     items: { create: orderItems },
@@ -171,6 +213,9 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                 },
             });
 
+            // Clear the purchased cart items
+            await cartService.clearCartForPatient(patient.id, tx);
+
             const admins = await tx.user.findMany({
                 where: {
                     role: Role.ADMIN,
@@ -186,12 +231,25 @@ const createOrder = async (userId: string, input: CreateOrderInput) => {
                     message: "A new medicine order has been placed and is awaiting payment.",
                     notificationType: NotificationType.ORDER,
                     relatedEntityType: "Order",
-                    relatedEntityId: order.id,
+                    relatedEntityId: createdOrder.id,
                 }, tx);
             }
 
-            return order;
+            return {
+                ...createdOrder,
+                subtotal: subtotalAmount,
+                shipping: ORDER_SHIPPING_AMOUNT,
+            };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+        if (idempotencyKey) {
+            idempotencyCache.set(`${patient.id}:${idempotencyKey}`, {
+                order,
+                expiresAt: Date.now() + IDEMPOTENCY_TTL_MS,
+            });
+        }
+
+        return order;
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
             throw new AppError("Stock changed while placing the order; please retry", 409);
@@ -207,7 +265,13 @@ const listMyOrders = async (userId: string, query: PatientOrderListQuery) => {
         ...(query.status && { status: query.status }),
     };
 
-    const [orders, total] = await prisma.$transaction([
+    const confirmedPurchaseWhere: Prisma.OrderWhereInput = {
+        patientId: patient.id,
+        status: { notIn: [OrderStatus.PENDING, OrderStatus.CANCELLED] },
+        payments: { some: { status: TransactionStatus.PAID } },
+    };
+
+    const [orders, total, confirmedTotal] = await prisma.$transaction([
         prisma.order.findMany({
             where,
             orderBy: { createdAt: "desc" },
@@ -221,19 +285,39 @@ const listMyOrders = async (userId: string, query: PatientOrderListQuery) => {
                 paymentExpiresAt: true,
                 createdAt: true,
                 updatedAt: true,
+                items: {
+                    select: { medicineName: true, quantity: true, subtotal: true },
+                },
+                payments: {
+                    where: { purpose: "MEDICINE_ORDER" },
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                    select: { status: true },
+                },
                 _count: { select: { items: true } },
             },
         }),
         prisma.order.count({ where }),
+        prisma.order.count({ where: confirmedPurchaseWhere }),
     ]);
 
     return {
-        orders,
+        orders: orders.map(({ payments, ...order }) => {
+            const amounts = getOrderAmounts(order.totalAmount, order.items);
+            return {
+                ...order,
+                subtotal: amounts.subtotal,
+                shipping: amounts.shipping,
+                paymentStatus: payments[0]?.status ?? TransactionStatus.PENDING,
+                isPaid: payments[0]?.status === TransactionStatus.PAID,
+            };
+        }),
         pagination: {
             page: query.page,
             limit: query.limit,
             total,
             totalPages: Math.ceil(total / query.limit),
+            confirmedTotal,
         },
     };
 };
@@ -251,6 +335,12 @@ const getMyOrder = async (userId: string, orderId: string) => {
             deliveryAddress: true,
             createdAt: true,
             updatedAt: true,
+            payments: {
+                where: { purpose: "MEDICINE_ORDER" },
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: { status: true, paidAt: true, refundStatus: true },
+            },
             items: {
                 select: {
                     id: true,
@@ -264,7 +354,17 @@ const getMyOrder = async (userId: string, orderId: string) => {
         },
     });
     if (!order) throw new AppError("Order not found", 404);
-    return order;
+    const payment = order.payments[0] ?? null;
+    const amounts = getOrderAmounts(order.totalAmount, order.items);
+    return {
+        ...order,
+        payments: undefined,
+        subtotal: amounts.subtotal,
+        shipping: amounts.shipping,
+        paymentStatus: payment?.status ?? TransactionStatus.PENDING,
+        isPaid: payment?.status === TransactionStatus.PAID,
+        payment,
+    };
 };
 
 const listOrdersForAdmin = async (adminUserId: string, query: AdminOrderListQuery) => {
@@ -293,13 +393,30 @@ const listOrdersForAdmin = async (adminUserId: string, query: AdminOrderListQuer
                     },
                 },
                 _count: { select: { items: true } },
+                items: { select: { quantity: true, subtotal: true } },
+                payments: {
+                    where: { purpose: "MEDICINE_ORDER" },
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                    select: { status: true },
+                },
             },
         }),
         prisma.order.count({ where }),
     ]);
 
     return {
-        orders,
+        orders: orders.map(({ payments, ...order }) => {
+            const amounts = getOrderAmounts(order.totalAmount, order.items);
+            return {
+                ...order,
+                subtotal: amounts.subtotal,
+                shipping: amounts.shipping,
+                itemQuantity: order.items.reduce((sum, item) => sum + item.quantity, 0),
+                paymentStatus: payments[0]?.status ?? TransactionStatus.PENDING,
+                isPaid: payments[0]?.status === TransactionStatus.PAID,
+            };
+        }),
         pagination: {
             page: query.page,
             limit: query.limit,
@@ -357,7 +474,15 @@ const getOrderForAdmin = async (adminUserId: string, orderId: string) => {
     });
 
     if (!order) throw new AppError("Order not found", 404);
-    return order;
+    const amounts = getOrderAmounts(order.totalAmount, order.items);
+    const payment = order.payments[0] ?? null;
+    return {
+        ...order,
+        subtotal: amounts.subtotal,
+        shipping: amounts.shipping,
+        paymentStatus: payment?.status ?? TransactionStatus.PENDING,
+        isPaid: payment?.status === TransactionStatus.PAID,
+    };
 };
 
 const updateOrderStatusForAdmin = async (

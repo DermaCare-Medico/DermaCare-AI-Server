@@ -11,10 +11,19 @@ const getAdminUserId = (req: Request) => {
 };
 
 const listPublicMedicines = async (req: Request, res: Response) => {
+    let requiresPrescription: boolean | undefined = undefined;
+    if (typeof req.query.requiresPrescription === "string") {
+        if (req.query.requiresPrescription.toLowerCase() === "true") requiresPrescription = true;
+        if (req.query.requiresPrescription.toLowerCase() === "false") requiresPrescription = false;
+    } else if (typeof req.query.requiresPrescription === "boolean") {
+        requiresPrescription = req.query.requiresPrescription;
+    }
+
     const result = await medicineService.listPublicMedicines({
         page: Number(req.query.page),
         limit: Number(req.query.limit),
         search: req.query.search as string | undefined,
+        requiresPrescription,
     });
     return res.status(HTTP_STATUS.OK).json({
         success: true,

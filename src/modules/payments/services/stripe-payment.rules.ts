@@ -33,6 +33,29 @@ export const buildCheckoutRedirects = (
   };
 };
 
+export const buildOrderCheckoutRedirects = (
+  clientUrl: string,
+  orderId: string,
+) => {
+  const orderPath = `/patient/orders/${encodeURIComponent(orderId)}`;
+  const success = new URL(orderPath, clientUrl);
+  success.searchParams.set("payment", "success");
+  success.searchParams.set("context", "order");
+  success.searchParams.set("orderId", orderId);
+  success.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
+
+  const cancel = new URL(orderPath, clientUrl);
+  cancel.searchParams.set("payment", "cancelled");
+  cancel.searchParams.set("context", "order");
+  cancel.searchParams.set("orderId", orderId);
+
+  return {
+    successUrl: success.toString()
+      .replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}"),
+    cancelUrl: cancel.toString(),
+  };
+};
+
 export const stripePaymentMatches = (
   expectedAmount: Prisma.Decimal,
   expectedCurrency: string,
@@ -40,6 +63,26 @@ export const stripePaymentMatches = (
   currency: string | null,
 ) => amountTotal === toStripeMinorUnits(expectedAmount)
   && currency?.toUpperCase() === expectedCurrency.toUpperCase();
+
+export const stripeOrderPaymentMatches = (
+  order: { id: string; patientId: string; totalAmount: Prisma.Decimal },
+  payment: { orderId: string; patientId: string; amount: Prisma.Decimal; currency: string },
+  checkout: {
+    context?: string;
+    entityId?: string;
+    patientId?: string;
+    clientReferenceId: string | null;
+    amountTotal: number | null;
+    currency: string | null;
+  },
+) => checkout.context === "order"
+  && checkout.entityId === order.id
+  && checkout.clientReferenceId === order.id
+  && checkout.patientId === payment.patientId
+  && payment.orderId === order.id
+  && order.patientId === payment.patientId
+  && payment.amount.equals(order.totalAmount)
+  && stripePaymentMatches(payment.amount, payment.currency, checkout.amountTotal, checkout.currency);
 
 export const paymentCompletedBeforeDeadline = (
   paidAt: Date,

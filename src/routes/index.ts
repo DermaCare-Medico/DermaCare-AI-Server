@@ -10,7 +10,7 @@ import paymentRoutes from "../modules/payments/payments.routes.js";
 import notificationRoutes from "../modules/notifications/notifications.routes.js";
 import adminRoutes from "../modules/admin/admin.routes.js";
 import userRoutes from "../modules/user/user.module.js";
-import storeRoutes from "../modules/stores/stores.routes.js";
+import storeRoutes, { cartRouter } from "../modules/stores/stores.routes.js";
 import orderRoutes from "../modules/orders/orders.routes.js";
 import prescriptionRoutes from "../modules/prescriptions/prescriptions.routes.js";
 import conversationRoutes from "../modules/conversations/conversations.routes.js";
@@ -65,6 +65,7 @@ apiRouter.use(
   patientRoutes,
   paymentRoutes,
   orderRoutes,
+  cartRouter,
 );
 
 apiRouter.use("/screenings", screeningRoutes);
