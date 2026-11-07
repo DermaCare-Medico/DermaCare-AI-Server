@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticate } from "../../middlewares/authenticate.middleware.js";
+import { authenticate, authenticateAccount } from "../../middlewares/authenticate.middleware.js";
 import {
   generalAuthLimiter,
   loginFailureLimiter,
@@ -41,7 +41,7 @@ router.post("/refresh-token", generalAuthLimiter, session.refresh);
 router.post("/logout", generalAuthLimiter, session.logout);
 
 // Signed-in account
-router.get("/me", authenticate, account.me);
+router.get("/me", authenticateAccount, account.me);
 router.post("/identities/google", authenticate, account.linkGoogle);
 router.delete("/identities/:provider", authenticate, account.unlinkIdentity);
 

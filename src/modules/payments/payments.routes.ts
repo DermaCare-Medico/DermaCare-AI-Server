@@ -28,8 +28,10 @@ paymentRouter.post(
     validateAppointmentPayment,
     asyncHandler(paymentVerificationController.createAppointmentCheckout),
 );
+
+// Pharmacy Order Payments
 paymentRouter.post(
-    "/orders/:id/payments",
+    "/orders/:id/payments/simulate",
     validateOrderPayment,
     asyncHandler(paymentController.payForOrderController),
 );

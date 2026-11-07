@@ -199,8 +199,8 @@ test("concurrent medicine-order payments have exactly one winner", async () => {
   });
 
   const results = await Promise.allSettled([
-    paymentService.payForOrder(patientA.userId, order.id, { amount: 20, currency: "BDT" }),
-    paymentService.payForOrder(patientA.userId, order.id, { amount: 20, currency: "BDT" }),
+    paymentService.payForOrder(patientA.userId, order.id, { amount: 25, currency: "BDT" }),
+    paymentService.payForOrder(patientA.userId, order.id, { amount: 25, currency: "BDT" }),
   ]);
 
   const storedOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
@@ -271,7 +271,7 @@ test("expiry cleanup leaves a paid order and its reserved stock unchanged", asyn
     deliveryAddress: "Integration test delivery address",
     items: [{ medicineId: inventory.medicineId, quantity: 3 }],
   });
-  await paymentService.payForOrder(patientA.userId, order.id, { amount: 30, currency: "BDT" });
+  await paymentService.payForOrder(patientA.userId, order.id, { amount: 35, currency: "BDT" });
   await prisma.order.update({
     where: { id: order.id },
     data: { paymentExpiresAt: new Date(Date.now() - 1_000) },

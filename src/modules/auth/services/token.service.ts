@@ -4,11 +4,17 @@ import { env } from "../../../config/env.js";
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { AUTH_TOKEN } from "../../../shared/constants/auth.constants.js";
-import { AccountStatus, Role } from "../../../generated/prisma/client.js";
-import type { RequestMeta, SessionTokens } from "../../../types/auth.types.js";
+import { AccountStatus, AuthProvider, Role } from "../../../generated/prisma/client.js";
+import type { AuthenticatedAccountSnapshot, RequestMeta, SessionTokens } from "../../../types/auth.types.js";
 
 const hashToken = (token: string): string =>
   crypto.createHash("sha256").update(token).digest("hex");
+
+export const REFRESH_REUSE_GRACE_MS = 10_000;
+export const isConcurrentRefreshReplay = (
+  revokedAt: Date,
+  now = new Date(),
+) => now.getTime() - revokedAt.getTime() <= REFRESH_REUSE_GRACE_MS;
 
 const isRole = (value: unknown): value is Role =>
   typeof value === "string" && (Object.values(Role) as string[]).includes(value);
@@ -47,7 +53,7 @@ type CurrentAccount = {
   role: Role;
   status: AccountStatus;
   deletedAt: Date | null;
-  authIdentities?: Array<{ updatedAt: Date }>;
+  authIdentities?: Array<{ updatedAt: Date; provider?: AuthProvider }>;
 } | null;
 
 export const resolveAccessTokenAccount = async (
@@ -76,8 +82,11 @@ export const resolveAccessTokenAccount = async (
     throw new AppError("Account is not active", 403);
   }
 
-  if (claims.iat && account.authIdentities?.[0]?.updatedAt) {
-    const passwordChangedAtMs = account.authIdentities[0].updatedAt.getTime();
+  const passwordIdentity = account.authIdentities?.find(
+    (identity) => identity.provider === AuthProvider.PASSWORD,
+  ) ?? account.authIdentities?.find((identity) => identity.provider === undefined);
+  if (claims.iat && passwordIdentity?.updatedAt) {
+    const passwordChangedAtMs = passwordIdentity.updatedAt.getTime();
     const tokenIssuedAtMs = claims.iat * 1000;
     if (tokenIssuedAtMs < passwordChangedAtMs - 2000) {
       throw new AppError("Token invalidated due to password change. Please log in again.", 401);
@@ -85,6 +94,29 @@ export const resolveAccessTokenAccount = async (
   }
 
   return { userId: account.id, role: account.role };
+};
+
+export const resolveAccessTokenAccountForMe = async (
+  claims: AccessTokenClaims,
+  findAccount: (userId: string) => Promise<AuthenticatedAccountSnapshot | null> = async (userId) =>
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        status: true,
+        emailVerified: true,
+        deletedAt: true,
+        authIdentities: { select: { provider: true, updatedAt: true } },
+        doctorProfile: { select: { approvalStatus: true } },
+      },
+    }),
+) => {
+  const account = await findAccount(claims.userId);
+  await resolveAccessTokenAccount(claims, async () => account);
+  return { userId: account!.id, role: account!.role, account: account! };
 };
 
 export const issueSession = async (
@@ -133,8 +165,11 @@ export const rotateSession = async (
   if (!record) throw new AppError("Invalid refresh token", 401);
 
   if (record.revokedAt) {
+    if (isConcurrentRefreshReplay(record.revokedAt)) {
+      throw new AppError("Refresh token already rotated; use the latest refresh token", 401);
+    }
     await revokeAllSessions(record.userId);
-    throw new AppError("Invalid refresh token", 401);
+    throw new AppError("Refresh token reuse detected; please sign in again", 401);
   }
 
   if (record.expiresAt.getTime() < Date.now()) {
@@ -153,7 +188,9 @@ export const rotateSession = async (
     where: { id: record.id, revokedAt: null },
     data: { revokedAt: new Date() },
   });
-  if (result.count !== 1) throw new AppError("Invalid refresh token", 401);
+  if (result.count !== 1) {
+    throw new AppError("Refresh token already rotated; use the latest refresh token", 401);
+  }
 
   return issueSession(record.user, meta);
 };

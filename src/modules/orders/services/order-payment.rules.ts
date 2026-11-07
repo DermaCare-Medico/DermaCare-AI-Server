@@ -1,4 +1,7 @@
+import { Prisma } from "../../../generated/prisma/client.js";
+
 export const ORDER_PAYMENT_WINDOW_MS = 30 * 60 * 1000;
+export const ORDER_SHIPPING_AMOUNT = new Prisma.Decimal("5.00");
 
 export const getOrderPaymentExpiry = (createdAt = new Date()) =>
     new Date(createdAt.getTime() + ORDER_PAYMENT_WINDOW_MS);
@@ -21,3 +24,14 @@ export const aggregateInventoryQuantities = (
     );
     return quantities;
 }, new Map());
+
+export const getOrderAmounts = (
+    totalAmount: Prisma.Decimal,
+    items: ReadonlyArray<{ subtotal: Prisma.Decimal }>,
+) => {
+    const subtotal = items.reduce(
+        (sum, item) => sum.add(item.subtotal),
+        new Prisma.Decimal(0),
+    );
+    return { subtotal, shipping: totalAmount.sub(subtotal), total: totalAmount };
+};

@@ -43,6 +43,24 @@ test("screening detail reload is owner-scoped, returns alternatives, and hides s
   });
 });
 
+test("screening history list is scoped to the authenticated owner", async () => {
+  let query: Record<string, unknown> | undefined;
+  const database = {
+    screening: {
+      findMany: async (args: Record<string, unknown>) => {
+        query = args;
+        return [];
+      },
+    },
+  } as never;
+
+  const { getScreeningHistory } = await import("./screening-history.service.js");
+  await getScreeningHistory("owner-user-id", database);
+  assert.deepEqual(query?.where, {
+    patient: { is: { userId: "owner-user-id" } },
+  });
+});
+
 test("only pending or failed screenings are eligible for an atomic image-processing claim", () => {
   assert.doesNotThrow(() => assertScreeningAcceptsImage("PENDING"));
   assert.doesNotThrow(() => assertScreeningAcceptsImage("FAILED"));

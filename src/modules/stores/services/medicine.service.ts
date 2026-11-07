@@ -64,9 +64,10 @@ const presentPublicMedicine = (medicine: PublicMedicineRecord) => {
     };
 };
 
-const publicMedicineWhere = (search?: string): Prisma.MedicineWhereInput => ({
+const publicMedicineWhere = (search?: string, requiresPrescription?: boolean): Prisma.MedicineWhereInput => ({
     isVerified: true,
     inventory: { is: { isAvailable: true, stockQuantity: { gt: 0 } } },
+    ...(requiresPrescription !== undefined && { requiresPrescription }),
     ...(search && {
         OR: [
             { name: { contains: search, mode: "insensitive" } },
@@ -77,7 +78,7 @@ const publicMedicineWhere = (search?: string): Prisma.MedicineWhereInput => ({
 });
 
 const listPublicMedicines = async (query: PublicMedicineListQuery) => {
-    const where = publicMedicineWhere(query.search);
+    const where = publicMedicineWhere(query.search, query.requiresPrescription);
     const [medicines, total] = await prisma.$transaction([
         prisma.medicine.findMany({
             where,

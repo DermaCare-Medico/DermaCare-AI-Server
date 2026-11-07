@@ -11,6 +11,7 @@ import { otpService } from "./otp.service.js";
 import { hashPassword, verifyPassword } from "./password.service.js";
 import { passwordResetService } from "./password-reset.service.js";
 import { registrationService } from "./registration.service.js";
+import { issueSession, revokeSession, rotateSession } from "./token.service.js";
 
 if (process.env.RUN_AUTH_DB_INTEGRATION !== "1") {
   test.skip("Auth database integration tests require RUN_AUTH_DB_INTEGRATION=1", () => {});
@@ -26,6 +27,7 @@ const emails = {
   concurrent: `${runTag}-concurrent@example.test`,
   doctor: `${runTag}-doctor@example.test`,
   admin: `${runTag}-admin@example.test`,
+  session: `${runTag}-session@example.test`,
 };
 const fixtureEmails = Object.values(emails);
 const code = "482731";
@@ -186,6 +188,38 @@ test("password reset commits password update and session revocation", async () =
   assert.equal(await verifyPassword(identity.passwordHash!, "AfterReset123"), true);
   assert.equal(activeSessions, 0);
   assert.ok(storedOtp.usedAt);
+});
+
+test("concurrent refresh rotates once without revoking the winning session", async () => {
+  const { user } = await createPasswordUser(emails.session);
+  const original = await issueSession({ id: user.id, role: user.role }, meta);
+  const results = await Promise.allSettled([
+    rotateSession(original.refreshToken, meta),
+    rotateSession(original.refreshToken, meta),
+  ]);
+  const winners = results.filter((result) => result.status === "fulfilled");
+  assert.equal(winners.length, 1);
+  assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+  assert.equal(await prisma.refreshToken.count({ where: { userId: user.id, revokedAt: null } }), 1);
+
+  const winner = (winners[0] as PromiseFulfilledResult<{ refreshToken: string }>).value;
+  await revokeSession(winner.refreshToken);
+  assert.equal(await prisma.refreshToken.count({ where: { userId: user.id, revokedAt: null } }), 0);
+  await assert.rejects(rotateSession(winner.refreshToken, meta), /already rotated/);
+});
+
+test("expired refresh credentials are rejected", async () => {
+  const { user } = await createPasswordUser(`${runTag}-expired@example.test`);
+  const rawToken = `${runTag}-expired-refresh-token`;
+  await prisma.refreshToken.create({
+    data: {
+      userId: user.id,
+      tokenHash: crypto.createHash("sha256").update(rawToken).digest("hex"),
+      expiresAt: new Date(Date.now() - 1_000),
+    },
+  });
+  await assert.rejects(rotateSession(rawToken, meta), /Refresh token expired/);
+  await prisma.user.delete({ where: { id: user.id } });
 });
 
 test("failed password reset rolls OTP consumption back", async () => {
