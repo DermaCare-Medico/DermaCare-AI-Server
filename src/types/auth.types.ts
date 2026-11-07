@@ -1,4 +1,17 @@
 import type { Role } from "../generated/prisma/client.js";
+import type { AccountStatus, AuthProvider, DoctorApprovalStatus } from "../generated/prisma/client.js";
+
+export interface AuthenticatedAccountSnapshot {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: AccountStatus;
+  emailVerified: boolean;
+  deletedAt: Date | null;
+  authIdentities: Array<{ provider: AuthProvider; updatedAt: Date }>;
+  doctorProfile: { approvalStatus: DoctorApprovalStatus } | null;
+}
 
 export type RegisterRole = Extract<Role, "PATIENT" | "DOCTOR">;
 

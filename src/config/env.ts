@@ -49,18 +49,9 @@ const envSchema = z
       z.boolean(),
     ).default(false),
 
-    // SMTP email configuration
-    SMTP_HOST: optionalString,
-    SMTP_PORT: z.coerce.number().int().positive().default(587),
-    SMTP_USER: optionalString,
-    SMTP_PASS: optionalString,
-    MAIL_FROM: optionalString,
-
-    // Gmail OAuth2 email configuration
-    EMAIL_GOOGLE_USER: optionalString,
-    EMAIL_GOOGLE_CLIENT_ID: optionalString,
-    EMAIL_GOOGLE_CLIENT_SECRET: optionalString,
-    EMAIL_GOOGLE_REFRESH_TOKEN: optionalString,
+    // Google Apps Script email delivery
+    GOOGLE_APPS_SCRIPT_URL: z.string().trim().url().min(1),
+    GOOGLE_APPS_SCRIPT_SECRET: z.string().trim().min(1),
 
     // CORS
     CORS_ORIGIN: z.string().default("http://localhost:3000"),
@@ -81,40 +72,6 @@ const envSchema = z
         message: "ALLOW_DEMO_PAYMENTS cannot be enabled in production",
       });
     }
-    if (values.SMTP_HOST && !values.MAIL_FROM) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["MAIL_FROM"],
-        message: "MAIL_FROM is required when SMTP_HOST is configured",
-      });
-    }
-
-    if (values.SMTP_USER && !values.SMTP_PASS) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["SMTP_PASS"],
-        message: "SMTP_PASS is required when SMTP_USER is configured",
-      });
-    }
-
-    const emailGoogleValues = [
-      values.EMAIL_GOOGLE_USER,
-      values.EMAIL_GOOGLE_CLIENT_ID,
-      values.EMAIL_GOOGLE_CLIENT_SECRET,
-      values.EMAIL_GOOGLE_REFRESH_TOKEN,
-    ];
-
-    const hasAnyEmailGoogleValue = emailGoogleValues.some(Boolean);
-    const hasAllEmailGoogleValues = emailGoogleValues.every(Boolean);
-
-    if (hasAnyEmailGoogleValue && !hasAllEmailGoogleValues) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["EMAIL_GOOGLE_REFRESH_TOKEN"],
-        message: "All EMAIL_GOOGLE_* variables must be configured together",
-      });
-    }
-
     const cloudinaryValues = [
       values.CLOUDINARY_CLOUD_NAME,
       values.CLOUDINARY_API_KEY,

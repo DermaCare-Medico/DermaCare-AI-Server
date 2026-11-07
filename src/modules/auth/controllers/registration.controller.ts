@@ -7,6 +7,7 @@ import {
   verifyOtpSchema,
 } from "../auth.validation.js";
 import { authService } from "../auth.service.js";
+import { setRefreshCookie } from "./session-cookie.js";
 
 export const registrationController = {
   requestOtp: asyncHandler(async (req, res) => {
@@ -32,6 +33,7 @@ export const registrationController = {
   verifyOtp: asyncHandler(async (req, res) => {
     const body = parse(verifyOtpSchema, req.body);
     const data = await authService.registration.verifyRegistration(body, metaOf(req));
+    setRefreshCookie(res, data.refreshToken);
     res.status(201).json({ success: true, message: "Account created", data });
   }),
 };

@@ -3,30 +3,18 @@ import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import {
-  doctorStatusOf,
   isUniqueViolation,
   publicUser,
-  userSelect,
 } from "./auth.helpers.js";
 import { verifyGoogleIdToken } from "./google.service.js";
+import type { AuthenticatedAccountSnapshot } from "../../../types/auth.types.js";
 
 export const accountService = {
-  async me(userId: string) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        ...userSelect,
-        authIdentities: { select: { provider: true } },
-      },
-    });
-
-    if (!user || user.deletedAt) {
-      throw new AppError("User not found", 404);
-    }
-
+  me(user: AuthenticatedAccountSnapshot) {
     return {
       user: publicUser(user),
-      doctorStatus: await doctorStatusOf(user),
+      doctorStatus: user.doctorProfile?.approvalStatus
+        ?? (user.role === "DOCTOR" ? "NO_PROFILE" : undefined),
       signInMethods: user.authIdentities.map(
         (i: { provider: string }) => i.provider,
       ),

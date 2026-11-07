@@ -107,6 +107,77 @@ const appointmentSelect = {
 
 type SelectedAppointment = Prisma.AppointmentGetPayload<{ select: typeof appointmentSelect }>;
 
+export const appointmentListSelect = {
+    id: true,
+    status: true,
+    videoLink: true,
+    meetingProvisioningStatus: true,
+    createdAt: true,
+    doctor: {
+        select: {
+            id: true,
+            consultationFee: true,
+            user: { select: { name: true } },
+            specializations: {
+                select: {
+                    specialization: { select: { id: true, name: true } },
+                },
+            },
+        },
+    },
+    slot: { select: { id: true, startTime: true, endTime: true } },
+    prescription: { select: { sentAt: true } },
+    payments: {
+        where: { purpose: "APPOINTMENT" as const },
+        orderBy: { createdAt: "desc" as const },
+        take: 1,
+        select: { status: true },
+    },
+} satisfies Prisma.AppointmentSelect;
+
+type SelectedAppointmentListItem = Prisma.AppointmentGetPayload<{
+    select: typeof appointmentListSelect;
+}>;
+
+export const presentAppointmentList = (appointment: SelectedAppointmentListItem) => {
+    const paymentStatus = appointment.payments[0]?.status ?? null;
+    const canViewConsultation = canExposeMeeting(appointment.status, paymentStatus);
+
+    return {
+        id: appointment.id,
+        status: appointment.status,
+        doctor: {
+            id: appointment.doctor.id,
+            name: appointment.doctor.user.name,
+            ...presentDoctorSpecializations(appointment.doctor.specializations),
+            consultationFee: appointment.doctor.consultationFee,
+        },
+        slot: appointment.slot,
+        paymentStatus,
+        prescriptionSent: appointment.prescription?.sentAt != null,
+        videoLink: canViewConsultation ? appointment.videoLink : null,
+        meetingProvisioningStatus: canViewConsultation
+            ? appointment.meetingProvisioningStatus
+            : "NOT_REQUESTED",
+        createdAt: appointment.createdAt,
+    };
+};
+
+export const patientAppointmentListWhere = (
+    patientId: string,
+    status?: AppointmentStatus,
+): Prisma.AppointmentWhereInput => ({
+    patientId,
+    ...(status && { status }),
+});
+
+export const appointmentListPagination = (page: number, limit: number, total: number) => ({
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+});
+
 const presentAppointment = (appointment: SelectedAppointment, includeDetails = false) => {
     const paymentStatus = appointment.payments[0]?.status ?? null;
     const canViewConsultation = canExposeMeeting(appointment.status, paymentStatus);
@@ -268,31 +339,26 @@ const getMyAppointments = async (
     query: AppointmentListQuery,
 ) => {
     const patient = await getActivePatient(userId);
-    const where: Prisma.AppointmentWhereInput = {
-        patientId: patient.id,
-        ...(query.status && { status: query.status }),
-    };
+    const where = patientAppointmentListWhere(patient.id, query.status);
     const skip = (query.page - 1) * query.limit;
 
-    const [appointments, total] = await prisma.$transaction([
+    // The former READ COMMITTED transaction did not provide a shared snapshot
+    // across these statements. Parallel reads keep the same consistency model
+    // while avoiding BEGIN/COMMIT and a single-connection query queue.
+    const [appointments, total] = await Promise.all([
         prisma.appointment.findMany({
             where,
             orderBy: { createdAt: "desc" },
             skip,
             take: query.limit,
-            select: appointmentSelect,
+            select: appointmentListSelect,
         }),
         prisma.appointment.count({ where }),
     ]);
 
     return {
-        appointments: appointments.map((appointment) => presentAppointment(appointment)),
-        pagination: {
-            page: query.page,
-            limit: query.limit,
-            total,
-            totalPages: Math.ceil(total / query.limit),
-        },
+        appointments: appointments.map(presentAppointmentList),
+        pagination: appointmentListPagination(query.page, query.limit, total),
     };
 };
 

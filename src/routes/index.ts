@@ -51,6 +51,7 @@ apiRouter.use(
 // Mount before the unscoped patient/doctor authorization chains below.
 // Those middleware chains run even when their nested routers do not match.
 apiRouter.use("/doctors", doctorRoutes);
+apiRouter.use("/screenings", screeningRoutes);
 
 apiRouter.use(
   authenticate,
@@ -67,7 +68,5 @@ apiRouter.use(
   orderRoutes,
   cartRouter,
 );
-
-apiRouter.use("/screenings", screeningRoutes);
 
 export default apiRouter;

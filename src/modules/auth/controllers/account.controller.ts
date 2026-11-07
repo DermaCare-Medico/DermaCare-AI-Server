@@ -1,4 +1,5 @@
 import { asyncHandler } from "../../../middlewares/asyncHandler.middleware.js";
+import { AppError } from "../../../shared/errors/AppError.js";
 import { accountService } from "../services/account.service.js";
 import { userIdOf } from "./controller.helpers.js";
 import {
@@ -9,7 +10,8 @@ import {
 
 export const accountController = {
   me: asyncHandler(async (req, res) => {
-    const data = await accountService.me(userIdOf(req));
+    if (!req.auth?.account) throw new AppError("Authentication required", 401);
+    const data = accountService.me(req.auth.account);
 
     res.status(200).json({ success: true, data });
   }),
