@@ -9,6 +9,7 @@ import apiRouter from "./routes/index.js";
 import docsRouter from "./docs/docs.routes.js";
 import { asyncHandler } from "./middlewares/asyncHandler.middleware.js";
 import { paymentWebhookController } from "./modules/payments/controllers/payment-webhook.controller.js";
+import temporaryGoogleCalendarOAuthRoutes from "./integrations/google-calendar/temporary-oauth.routes.js";
 
 const app = express();
 
@@ -24,6 +25,9 @@ app.post(
 );
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// Temporary one-time utility for obtaining a Google Calendar refresh token.
+app.use(temporaryGoogleCalendarOAuthRoutes);
 
 app.get(["/", "/health"], (_req, res) => {
   res.status(200).json({
