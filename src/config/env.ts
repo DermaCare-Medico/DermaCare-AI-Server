@@ -36,6 +36,10 @@ const envSchema = z
     GOOGLE_CALENDAR_CLIENT_SECRET: optionalString,
     GOOGLE_CALENDAR_REDIRECT_URI: optionalString,
     GOOGLE_CALENDAR_REFRESH_TOKEN: optionalString,
+    GOOGLE_CALENDAR_OAUTH_TRANSFER_SECRET: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.string().min(32).optional(),
+    ),
     GOOGLE_CALENDAR_ID: z.string().default("primary"),
 
     // Stripe Checkout (optional; checkout endpoints report unavailable when omitted)

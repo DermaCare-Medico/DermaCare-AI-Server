@@ -8,10 +8,14 @@ import { env } from "../../config/env.js";
 // second token store and so every authorization attempt is single-use.
 const PRODUCTION_REDIRECT_URI = "https://dermacare-ai-server.onrender.com/oauth2callback";
 const STATE_TTL_MS = 10 * 60 * 1000;
+const REFRESH_TOKEN_TTL_MS = 10 * 60 * 1000;
 const pendingStates = new Map<string, number>();
+let pendingRefreshToken: { token: string; expiresAt: number } | undefined;
 
 const configurationError = () =>
-  !env.GOOGLE_CALENDAR_CLIENT_ID || !env.GOOGLE_CALENDAR_CLIENT_SECRET;
+  !env.GOOGLE_CALENDAR_CLIENT_ID
+  || !env.GOOGLE_CALENDAR_CLIENT_SECRET
+  || !env.GOOGLE_CALENDAR_OAUTH_TRANSFER_SECRET;
 
 const createOAuthClient = () => new google.auth.OAuth2(
   env.GOOGLE_CALENDAR_CLIENT_ID,
@@ -24,6 +28,18 @@ const removeExpiredStates = () => {
   for (const [state, expiresAt] of pendingStates) {
     if (expiresAt <= now) pendingStates.delete(state);
   }
+  if (pendingRefreshToken && pendingRefreshToken.expiresAt <= now) {
+    pendingRefreshToken = undefined;
+  }
+};
+
+const hasValidTransferSecret = (candidate: string | undefined) => {
+  const expected = env.GOOGLE_CALENDAR_OAUTH_TRANSFER_SECRET;
+  if (!expected || !candidate) return false;
+  const expectedBytes = Buffer.from(expected);
+  const candidateBytes = Buffer.from(candidate);
+  return expectedBytes.length === candidateBytes.length
+    && timingSafeEqual(expectedBytes, candidateBytes);
 };
 
 const consumeState = (candidate: string) => {
@@ -82,11 +98,36 @@ router.get("/oauth2callback", async (req, res) => {
 
   try {
     const { tokens } = await createOAuthClient().getToken(code);
-    res.status(200).send(`Google Calendar authorization completed. Refresh token received: ${Boolean(tokens.refresh_token)}.`);
+    if (!tokens.refresh_token) {
+      res.status(502).send("Google Calendar authorization did not provide a refresh token.");
+      return;
+    }
+    pendingRefreshToken = {
+      token: tokens.refresh_token,
+      expiresAt: Date.now() + REFRESH_TOKEN_TTL_MS,
+    };
+    res.status(200).send("Google Calendar authorization completed. Retrieve the refresh token using the one-time transfer endpoint.");
   } catch {
     // Do not log or return the authorization code, tokens, or client secret.
     res.status(502).send("Google Calendar authorization could not be completed.");
   }
+});
+
+router.post("/oauth2token", (req, res) => {
+  removeExpiredStates();
+  if (!hasValidTransferSecret(req.get("x-google-calendar-transfer-secret"))) {
+    res.status(404).send("Not found.");
+    return;
+  }
+
+  if (!pendingRefreshToken) {
+    res.status(404).send("No pending Google Calendar token.");
+    return;
+  }
+
+  const refreshToken = pendingRefreshToken.token;
+  pendingRefreshToken = undefined;
+  res.status(200).json({ refreshToken });
 });
 
 export default router;
