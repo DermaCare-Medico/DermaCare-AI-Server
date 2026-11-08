@@ -19,7 +19,8 @@ import {
 } from "../../doctors/services/doctor-earnings.rules.js";
 import Stripe from "stripe";
 import { env } from "../../../config/env.js";
-import { buildCheckoutRedirects, doctorPayoutCheckoutIdempotencyKey, toStripeMinorUnits } from "../../payments/services/stripe-payment.rules.js";
+import { buildCheckoutRedirects, buildDoctorPayoutMetadata, doctorPayoutCheckoutIdempotencyKey, toStripeMinorUnits } from "../../payments/services/stripe-payment.rules.js";
+import { reconcileDoctorPayout } from "../../payments/services/doctor-payout-reconciliation.service.js";
 
 let stripeClient: Stripe | undefined;
 const stripe = () => {
@@ -43,6 +44,8 @@ const payoutSelect = {
     status: true,
     paidAt: true,
     transactionReference: true,
+    stripePaymentIntentId: true,
+    paidByAdminId: true,
     notes: true,
     createdAt: true,
     updatedAt: true,
@@ -121,6 +124,12 @@ const sendPayout = async (adminUserId: string, payoutId: string) => {
                 data: { status: PayoutStatus.PENDING },
             });
             payout = { ...payout, status: PayoutStatus.PENDING };
+        } else if (existing.status === "complete") {
+            const reconciled = await reconcileDoctorPayout(existing);
+            if (reconciled) {
+                return { checkoutUrl: existing.url, sessionId: existing.id, payoutId, status: PayoutStatus.PAID };
+            }
+            return { checkoutUrl: existing.url, sessionId: existing.id, payoutId, status: PayoutStatus.PROCESSING };
         } else {
             throw new AppError("Payout confirmation is being processed", 409);
         }
@@ -146,7 +155,10 @@ const sendPayout = async (adminUserId: string, payoutId: string) => {
         success_url: redirects.successUrl,
         cancel_url: redirects.cancelUrl,
         client_reference_id: payoutId,
-        metadata: { context: "doctorPayout", payoutId, doctorId: payout.doctorId, adminUserId },
+        metadata: { context: "doctorPayout", ...buildDoctorPayoutMetadata(payoutId, payout.doctorId, adminUserId) },
+        payment_intent_data: {
+            metadata: buildDoctorPayoutMetadata(payoutId, payout.doctorId, adminUserId),
+        },
         line_items: [{ quantity: 1, price_data: {
             currency: "bdt",
             unit_amount: toStripeMinorUnits(payout.netAmount),

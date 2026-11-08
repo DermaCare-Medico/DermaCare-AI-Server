@@ -29,6 +29,7 @@ model User {
   // Relationships
   auditLogs                AuditLog[]
   approvedDoctors          DoctorProfile[]   @relation("DoctorApprover")
+  doctorPayoutsPaid        DoctorPayout[]    @relation("DoctorPayoutPaidByAdmin")
   reviewedMedicineRequests MedicineRequest[] @relation("MedicineRequestReviewer")
   verifiedMedicines        Medicine[]        @relation("MedicineVerifier")
   messages                 Message[]

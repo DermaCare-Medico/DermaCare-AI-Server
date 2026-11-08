@@ -32,7 +32,7 @@ const sendPayout = async (req: Request, res: Response) => {
     return res.status(HTTP_STATUS.OK).json({
         success: true,
         statusCode: HTTP_STATUS.OK,
-        message: "Doctor payout checkout created successfully",
+        message: "TEST PAYOUT checkout created successfully. This simulates platform collection and does not disburse funds to a doctor.",
         data: payout,
     });
 };

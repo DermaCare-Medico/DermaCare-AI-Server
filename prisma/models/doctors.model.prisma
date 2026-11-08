@@ -115,11 +115,14 @@ model DoctorPayout {
   status               PayoutStatus @default(PENDING)
   paidAt               DateTime?    @map("paid_at") @db.Timestamp(6)
   transactionReference String?      @map("transaction_reference") @db.VarChar(255)
+  stripePaymentIntentId String?     @unique @map("stripe_payment_intent_id") @db.VarChar(255)
+  paidByAdminId        String?      @map("paid_by_admin_id") @db.Uuid
   notes                String?
   createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamp(6)
 
   doctor DoctorProfile      @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  paidByAdmin User?         @relation("DoctorPayoutPaidByAdmin", fields: [paidByAdminId], references: [id], onDelete: Restrict)
   items  DoctorPayoutItem[]
 
   @@unique([doctorId, periodStart, periodEnd])
