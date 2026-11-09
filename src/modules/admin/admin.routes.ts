@@ -31,6 +31,7 @@ import {
     validateAdminMedicineList,
     validateAdminMedicineUpdate,
     validateAdminPayoutId,
+    validateAdminPayoutCheckoutStatus,
     validateAdminPayoutList,
     validateAdminUserList,
     validateAdminUserId,
@@ -61,6 +62,11 @@ adminRouter.post(
     "/doctor-payments/:id/send",
     validateAdminPayoutId,
     asyncHandler(doctorPayoutAdminController.sendPayout),
+);
+adminRouter.get(
+    "/doctor-payments/:payoutId/checkout-status",
+    validateAdminPayoutCheckoutStatus,
+    asyncHandler(doctorPayoutAdminController.getCheckoutStatus),
 );
 adminRouter.get(
     "/doctor-payments/:id",

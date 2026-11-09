@@ -24,3 +24,8 @@ test("Admin router exposes doctor document streaming by opaque index", () => {
   assert.ok(routes.some((route: any) =>
     route.method === "GET" && route.path === "/doctors/:id/documents/:documentIndex"));
 });
+
+test("Admin router exposes read-only Stripe TEST payout Checkout status", () => {
+  assert.ok(routes.some((route: any) =>
+    route.method === "GET" && route.path === "/doctor-payments/:payoutId/checkout-status"));
+});

@@ -92,6 +92,19 @@ export const paymentCompletedBeforeDeadline = (
 export const doctorPayoutCheckoutIdempotencyKey = (payoutId: string, priorSessionId?: string | null) =>
   `doctor-payout-checkout-${payoutId}-${priorSessionId ?? "initial"}`;
 
+export const buildDoctorPayoutMetadata = (payoutId: string, doctorId: string, adminId: string) => ({
+  payoutId,
+  doctorId,
+  adminId,
+});
+
+export const doctorPayoutMetadataMatches = (
+  metadata: Record<string, string> | null | undefined,
+  expected: { payoutId: string; doctorId: string; adminId: string },
+) => metadata?.payoutId === expected.payoutId
+  && metadata?.doctorId === expected.doctorId
+  && metadata?.adminId === expected.adminId;
+
 export const stripeDoctorPayoutMatches = (
   payout: { id: string; doctorId: string; amount: Prisma.Decimal; sessionId: string },
   checkout: {

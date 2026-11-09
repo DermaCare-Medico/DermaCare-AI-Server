@@ -18,6 +18,8 @@ import {
   Role,
   ScreeningStatus,
   SlotStatus,
+  TransactionPurpose,
+  TransactionStatus,
 } from "../../src/generated/prisma/client.js";
 
 // Ensure seed only executes in development or test environments
@@ -936,42 +938,100 @@ async function main() {
   const payoutItemId = "35000000-0000-4000-8000-000000000001";
   const doctor1ProfileId = "31000000-0000-4000-8000-000000000001";
   const appt1Id = "60000000-0000-4000-8000-000000000001";
+  const seedPaymentId = "36000000-0000-4000-8000-000000000001";
+  const seedPaymentIntentId = "pi_seed_appointment_000001";
+  const seedProviderTransactionId = "cs_seed_appointment_000001";
 
-  await prisma.doctorPayout.upsert({
-    where: {
-      doctorId_periodStart_periodEnd: {
-        doctorId: doctor1ProfileId,
-        periodStart: new Date("2026-10-01T00:00:00Z"),
-        periodEnd: new Date("2026-10-15T00:00:00Z"),
-      },
+  await prisma.paymentTransaction.upsert({
+    where: { id: seedPaymentId },
+    update: {
+      patientId: "21000000-0000-4000-8000-000000000001",
+      appointmentId: appt1Id,
+      purpose: TransactionPurpose.APPOINTMENT,
+      amount: new Prisma.Decimal("1500.00"),
+      currency: "BDT",
+      status: TransactionStatus.PAID,
+      provider: "STRIPE",
+      providerTransactionId: seedProviderTransactionId,
+      stripePaymentIntentId: seedPaymentIntentId,
+      refundStatus: null,
+      refundedAt: null,
+      paidAt: new Date("2026-10-10T12:00:00Z"),
     },
-    update: {},
     create: {
+      id: seedPaymentId,
+      patientId: "21000000-0000-4000-8000-000000000001",
+      appointmentId: appt1Id,
+      purpose: TransactionPurpose.APPOINTMENT,
+      amount: new Prisma.Decimal("1500.00"),
+      currency: "BDT",
+      status: TransactionStatus.PAID,
+      provider: "STRIPE",
+      providerTransactionId: seedProviderTransactionId,
+      stripePaymentIntentId: seedPaymentIntentId,
+      paidAt: new Date("2026-10-10T12:00:00Z"),
+    },
+  });
+
+  const seedPayoutWhere = {
+    doctorId_periodStart_periodEnd_payoutSequence: {
+      doctorId: doctor1ProfileId,
+      periodStart: new Date("2026-10-01T00:00:00Z"),
+      periodEnd: new Date("2026-10-15T00:00:00Z"),
+      payoutSequence: 1,
+    },
+  };
+  const existingSeedPayout = await prisma.doctorPayout.findUnique({ where: seedPayoutWhere, select: { id: true, status: true } });
+  const seedPayout = existingSeedPayout
+    ? (existingSeedPayout.status === PayoutStatus.PAID
+      ? existingSeedPayout
+      : await prisma.doctorPayout.update({
+        where: { id: existingSeedPayout.id },
+        data: { totalConsultations: 1, grossAmount: new Prisma.Decimal("1500.00"), platformFee: new Prisma.Decimal("225.00"), netAmount: new Prisma.Decimal("1275.00") },
+        select: { id: true, status: true },
+      }))
+    : await prisma.doctorPayout.create({
+      data: {
       id: payoutId,
       doctorId: doctor1ProfileId,
       periodStart: new Date("2026-10-01T00:00:00Z"),
       periodEnd: new Date("2026-10-15T00:00:00Z"),
       totalConsultations: 1,
       grossAmount: new Prisma.Decimal("1500.00"),
-      platformFee: new Prisma.Decimal("150.00"),
-      netAmount: new Prisma.Decimal("1350.00"),
+      platformFee: new Prisma.Decimal("225.00"),
+      netAmount: new Prisma.Decimal("1275.00"),
       status: PayoutStatus.PENDING,
       notes: "Demo cycle bi-weekly consultation remittance for development environment.",
-    },
+      },
+    select: { id: true, status: true },
   });
 
-  await prisma.doctorPayoutItem.upsert({
+  const existingSeedItem = await prisma.doctorPayoutItem.findUnique({
     where: { appointmentId: appt1Id },
-    update: {},
-    create: {
-      id: payoutItemId,
-      payoutId: payoutId,
-      appointmentId: appt1Id,
-      consultationAmount: new Prisma.Decimal("1500.00"),
-      platformFee: new Prisma.Decimal("150.00"),
-      doctorAmount: new Prisma.Decimal("1350.00"),
-    },
+    select: { id: true },
   });
+  if (existingSeedItem && seedPayout.status !== PayoutStatus.PAID) {
+    await prisma.doctorPayoutItem.update({
+      where: { id: existingSeedItem.id },
+      data: {
+        payoutId: seedPayout.id,
+        consultationAmount: new Prisma.Decimal("1500.00"),
+        platformFee: new Prisma.Decimal("225.00"),
+        doctorAmount: new Prisma.Decimal("1275.00"),
+      },
+    });
+  } else if (!existingSeedItem && seedPayout.status !== PayoutStatus.PAID) {
+    await prisma.doctorPayoutItem.create({
+      data: {
+        id: payoutItemId,
+        payoutId: seedPayout.id,
+        appointmentId: appt1Id,
+        consultationAmount: new Prisma.Decimal("1500.00"),
+        platformFee: new Prisma.Decimal("225.00"),
+        doctorAmount: new Prisma.Decimal("1275.00"),
+      },
+    });
+  }
 
   // --------------------------------------------------------------------------
   // 11. NOTIFICATIONS

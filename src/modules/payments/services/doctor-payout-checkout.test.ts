@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { Prisma } from "../../../generated/prisma/client.js";
 import {
+  buildDoctorPayoutMetadata,
   buildCheckoutRedirects,
   doctorPayoutCheckoutIdempotencyKey,
   stripeDoctorPayoutMatches,
@@ -16,9 +17,9 @@ const checkout = {
 
 test("doctor payout checkout redirects include payout and Stripe session verification data", () => {
   const urls = buildCheckoutRedirects("https://client.example", "doctorPayout", payout.id);
-  assert.match(urls.successUrl, /session_id=%7BCHECKOUT_SESSION_ID%7D/);
+  assert.match(urls.successUrl, /session_id=\{CHECKOUT_SESSION_ID\}/);
   assert.match(urls.successUrl, /doctorPayoutId=payout-1/);
-  assert.match(urls.cancelUrl, /session_id=%7BCHECKOUT_SESSION_ID%7D/);
+  assert.match(urls.cancelUrl, /session_id=\{CHECKOUT_SESSION_ID\}/);
   assert.match(urls.cancelUrl, /doctorPayoutId=payout-1/);
 });
 
@@ -33,4 +34,12 @@ test("signed payout completion requires exact ownership, session, amount and cur
   assert.equal(stripeDoctorPayoutMatches(payout, { ...checkout, doctorId: "other" }), false);
   assert.equal(stripeDoctorPayoutMatches(payout, { ...checkout, id: "replayed-session" }), false);
   assert.equal(stripeDoctorPayoutMatches(payout, { ...checkout, currency: "usd" }), false);
+});
+
+test("Checkout and PaymentIntent payout metadata use the same values", () => {
+  const metadata = buildDoctorPayoutMetadata("payout-1", "doctor-1", "admin-1");
+  assert.deepEqual({ context: "doctorPayout", ...metadata }, {
+    context: "doctorPayout", payoutId: "payout-1", doctorId: "doctor-1", adminId: "admin-1",
+  });
+  assert.deepEqual(metadata, { payoutId: "payout-1", doctorId: "doctor-1", adminId: "admin-1" });
 });

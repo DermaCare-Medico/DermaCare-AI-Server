@@ -214,6 +214,11 @@ const appointmentListAdminQuerySchema = z.object({
 
 const appointmentIdAdminParamsSchema = z.object({ id: uuidSchema }).strict();
 
+const payoutCheckoutStatusQuerySchema = z.object({
+    session_id: z.string().regex(/^cs_test_[A-Za-z0-9]+$/, "A valid Stripe TEST Checkout Session ID is required"),
+}).strict();
+const payoutCheckoutStatusParamsSchema = z.object({ payoutId: uuidSchema }).strict();
+
 const auditLogListQuerySchema = z.object({
     ...paginationShape,
     dateFrom: z.coerce.date().optional(),
@@ -229,6 +234,10 @@ const auditLogListQuerySchema = z.object({
 
 export const validateAdminPayoutList = validateRequest({ query: payoutListQuerySchema });
 export const validateAdminPayoutId = validateRequest({ params: payoutIdParamsSchema });
+export const validateAdminPayoutCheckoutStatus = validateRequest({
+    params: payoutCheckoutStatusParamsSchema,
+    query: payoutCheckoutStatusQuerySchema,
+});
 export const validateAdminOrderList = validateRequest({ query: orderListQuerySchema });
 export const validateAdminOrderId = validateRequest({ params: orderIdParamsSchema });
 export const validateAdminOrderStatus = validateRequest({

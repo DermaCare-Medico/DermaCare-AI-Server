@@ -32,7 +32,7 @@ const sendPayout = async (req: Request, res: Response) => {
     return res.status(HTTP_STATUS.OK).json({
         success: true,
         statusCode: HTTP_STATUS.OK,
-        message: "Doctor payout checkout created successfully",
+        message: "TEST PAYOUT checkout created successfully. This simulates platform collection and does not disburse funds to a doctor.",
         data: payout,
     });
 };
@@ -42,6 +42,17 @@ const getPayout = async (req: Request, res: Response) => res.status(HTTP_STATUS.
     statusCode: HTTP_STATUS.OK,
     message: "Doctor payout retrieved successfully",
     data: await doctorPayoutAdminService.getPayout(getUserId(req), req.params.id!),
+});
+
+const getCheckoutStatus = async (req: Request, res: Response) => res.status(HTTP_STATUS.OK).json({
+    success: true,
+    statusCode: HTTP_STATUS.OK,
+    message: "Doctor payout Checkout status retrieved successfully",
+    data: await doctorPayoutAdminService.getCheckoutStatus(
+        getUserId(req),
+        req.params.payoutId!,
+        req.query.session_id as string,
+    ),
 });
 
 const getMonthlyEarningsSummary = async (req: Request, res: Response) => {
@@ -103,6 +114,7 @@ const generatePayout = async (req: Request, res: Response) => {
 export const doctorPayoutAdminController = {
     listPayouts,
     getPayout,
+    getCheckoutStatus,
     sendPayout,
     getMonthlyEarningsSummary,
     getDoctorPayable,

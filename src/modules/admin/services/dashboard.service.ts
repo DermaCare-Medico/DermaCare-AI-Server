@@ -12,10 +12,9 @@ import {
 import { prisma } from "../../../lib/prisma.js";
 import { AppError } from "../../../shared/errors/AppError.js";
 import {
-    calculateConsultationEarnings,
-    getEligiblePayment,
     getMonthDateRange,
 } from "../../doctors/services/doctor-earnings.rules.js";
+import { aggregateDoctorEarnings } from "../../doctors/services/doctor-earnings-aggregation.service.js";
 
 type FinancialAppointment = {
     status: AppointmentStatus;
@@ -40,26 +39,20 @@ export const calculateDashboardFinancials = (
     now = new Date(),
 ) => {
     const month = getMonthDateRange(now.getUTCFullYear(), now.getUTCMonth() + 1);
-    let totalConsultationRevenue = new Prisma.Decimal(0);
-    let platformCommissionEarned = new Prisma.Decimal(0);
-    let outstandingDoctorPayouts = new Prisma.Decimal(0);
+    const aggregate = aggregateDoctorEarnings(appointments);
+    let totalConsultationRevenue = aggregate.grossAmount;
+    let platformCommissionEarned = aggregate.platformFee;
+    let outstandingDoctorPayouts = aggregate.pendingCommittedAmount.add(aggregate.unallocatedAmount);
     let monthlyConsultationRevenue = new Prisma.Decimal(0);
     let monthlyPlatformCommission = new Prisma.Decimal(0);
 
     for (const appointment of appointments) {
-        const payment = getEligiblePayment(appointment);
+        const payment = appointment.payments.find((candidate) => candidate.status === TransactionStatus.PAID);
         if (!payment) continue;
-        const earnings = calculateConsultationEarnings(payment.amount);
-        totalConsultationRevenue = totalConsultationRevenue.add(earnings.consultationAmount);
-        platformCommissionEarned = platformCommissionEarned.add(earnings.platformFee);
-        if (!appointment.payoutItem || appointment.payoutItem.payout.status !== PayoutStatus.PAID) {
-            outstandingDoctorPayouts = outstandingDoctorPayouts.add(
-                appointment.payoutItem?.doctorAmount ?? earnings.doctorAmount,
-            );
-        }
         if (appointment.slot.startTime >= month.periodStart && appointment.slot.startTime <= month.periodEnd) {
-            monthlyConsultationRevenue = monthlyConsultationRevenue.add(earnings.consultationAmount);
-            monthlyPlatformCommission = monthlyPlatformCommission.add(earnings.platformFee);
+            const monthly = aggregateDoctorEarnings([appointment]);
+            monthlyConsultationRevenue = monthlyConsultationRevenue.add(monthly.grossAmount);
+            monthlyPlatformCommission = monthlyPlatformCommission.add(monthly.platformFee);
         }
     }
 

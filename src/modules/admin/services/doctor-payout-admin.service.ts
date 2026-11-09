@@ -17,9 +17,12 @@ import {
     getMonthDateRange,
     slotStartInEarningsRange,
 } from "../../doctors/services/doctor-earnings.rules.js";
+import { aggregateDoctorEarnings, findLedgerMismatches, formatDoctorEarningsAggregate } from "../../doctors/services/doctor-earnings-aggregation.service.js";
 import Stripe from "stripe";
 import { env } from "../../../config/env.js";
-import { buildCheckoutRedirects, doctorPayoutCheckoutIdempotencyKey, toStripeMinorUnits } from "../../payments/services/stripe-payment.rules.js";
+import { buildCheckoutRedirects, buildDoctorPayoutMetadata, doctorPayoutCheckoutIdempotencyKey, stripeDoctorPayoutMatches, toStripeMinorUnits } from "../../payments/services/stripe-payment.rules.js";
+import { reconcileDoctorPayout } from "../../payments/services/doctor-payout-reconciliation.service.js";
+import { logger } from "../../../shared/logger/logger.js";
 
 let stripeClient: Stripe | undefined;
 const stripe = () => {
@@ -27,6 +30,9 @@ const stripe = () => {
     stripeClient ??= new Stripe(env.STRIPE_SECRET_KEY);
     return stripeClient;
 };
+
+export const isStripeCheckoutSessionResourceMissing = (error: unknown): error is Stripe.errors.StripeInvalidRequestError =>
+    error instanceof Stripe.errors.StripeInvalidRequestError && error.code === "resource_missing";
 
 export const isRetryablePayoutGenerationConflict = (error: unknown) =>
     error instanceof Prisma.PrismaClientKnownRequestError
@@ -36,6 +42,7 @@ const payoutSelect = {
     id: true,
     periodStart: true,
     periodEnd: true,
+    payoutSequence: true,
     totalConsultations: true,
     grossAmount: true,
     platformFee: true,
@@ -43,6 +50,8 @@ const payoutSelect = {
     status: true,
     paidAt: true,
     transactionReference: true,
+    stripePaymentIntentId: true,
+    paidByAdminId: true,
     notes: true,
     createdAt: true,
     updatedAt: true,
@@ -111,7 +120,21 @@ const sendPayout = async (adminUserId: string, payoutId: string) => {
 
     if (!payout) throw new AppError("Doctor payout not found", 404);
     if (payout.status === PayoutStatus.PROCESSING && payout.transactionReference) {
-        const existing = await stripe().checkout.sessions.retrieve(payout.transactionReference);
+        let existing: Stripe.Checkout.Session;
+        try {
+            existing = await stripe().checkout.sessions.retrieve(payout.transactionReference);
+        } catch (error) {
+            if (!isStripeCheckoutSessionResourceMissing(error)) throw error;
+            logger.warn({
+                payoutId: payout.id,
+                sessionId: payout.transactionReference,
+                stripeRequestId: error.requestId,
+            }, "Stored Stripe Checkout Session could not be found in the configured Stripe account");
+            throw new AppError(
+                "The stored Stripe Checkout Session could not be found in the currently configured Stripe account. Verify the Stripe account/API key before taking further action.",
+                409,
+            );
+        }
         if (existing.status === "open" && existing.url) {
             return { checkoutUrl: existing.url, sessionId: existing.id, payoutId, status: payout.status };
         }
@@ -121,6 +144,12 @@ const sendPayout = async (adminUserId: string, payoutId: string) => {
                 data: { status: PayoutStatus.PENDING },
             });
             payout = { ...payout, status: PayoutStatus.PENDING };
+        } else if (existing.status === "complete") {
+            const reconciled = await reconcileDoctorPayout(existing);
+            if (reconciled) {
+                return { checkoutUrl: existing.url, sessionId: existing.id, payoutId, status: PayoutStatus.PAID };
+            }
+            return { checkoutUrl: existing.url, sessionId: existing.id, payoutId, status: PayoutStatus.PROCESSING };
         } else {
             throw new AppError("Payout confirmation is being processed", 409);
         }
@@ -146,7 +175,10 @@ const sendPayout = async (adminUserId: string, payoutId: string) => {
         success_url: redirects.successUrl,
         cancel_url: redirects.cancelUrl,
         client_reference_id: payoutId,
-        metadata: { context: "doctorPayout", payoutId, doctorId: payout.doctorId, adminUserId },
+        metadata: { context: "doctorPayout", ...buildDoctorPayoutMetadata(payoutId, payout.doctorId, adminUserId) },
+        payment_intent_data: {
+            metadata: buildDoctorPayoutMetadata(payoutId, payout.doctorId, adminUserId),
+        },
         line_items: [{ quantity: 1, price_data: {
             currency: "bdt",
             unit_amount: toStripeMinorUnits(payout.netAmount),
@@ -168,6 +200,54 @@ const sendPayout = async (adminUserId: string, payoutId: string) => {
     return { checkoutUrl: session.url, sessionId: session.id, payoutId, status: PayoutStatus.PROCESSING };
 };
 
+const getCheckoutStatus = async (adminUserId: string, payoutId: string, sessionId: string) => {
+    await requireActiveAdmin(adminUserId);
+
+    const payout = await prisma.doctorPayout.findUnique({
+        where: { id: payoutId },
+        select: { id: true, doctorId: true, netAmount: true, status: true, transactionReference: true },
+    });
+    if (!payout) throw new AppError("Doctor payout not found", 404);
+    if (!payout.transactionReference || payout.transactionReference !== sessionId) {
+        throw new AppError("Checkout Session does not belong to this doctor payout", 400);
+    }
+
+    let session: Stripe.Checkout.Session;
+    try {
+        session = await stripe().checkout.sessions.retrieve(sessionId);
+    } catch (error) {
+        if (isStripeCheckoutSessionResourceMissing(error)) {
+            throw new AppError("Stripe Checkout Session not found", 404);
+        }
+        throw error;
+    }
+
+    const metadata = session.metadata;
+    if (metadata?.context !== "doctorPayout"
+        || metadata.payoutId !== payout.id
+        || metadata.doctorId !== payout.doctorId
+        || session.client_reference_id !== payout.id
+        || !stripeDoctorPayoutMatches({
+            id: payout.id,
+            doctorId: payout.doctorId,
+            amount: payout.netAmount,
+            sessionId: payout.transactionReference,
+        }, {
+            id: session.id,
+            clientReferenceId: session.client_reference_id,
+            context: metadata.context,
+            payoutId: metadata.payoutId,
+            doctorId: metadata.doctorId,
+            amountTotal: session.amount_total,
+            currency: session.currency,
+        })) {
+        throw new AppError("Stripe Checkout Session does not match the doctor payout", 400);
+    }
+
+    // This is deliberately read-only. PAID can only be written by the verified webhook.
+    return { payoutId: payout.id, sessionId: session.id, status: payout.status };
+};
+
 const getMonthlyEarningsSummary = async (
     adminUserId: string,
     query: {
@@ -186,8 +266,6 @@ const getMonthlyEarningsSummary = async (
 
     const doctorWhere: Prisma.DoctorProfileWhereInput = {
         ...(query.doctorId && { id: query.doctorId }),
-        approvalStatus: DoctorApprovalStatus.APPROVED,
-        user: { status: AccountStatus.ACTIVE, deletedAt: null },
     };
 
     const [doctors, total] = await prisma.$transaction([
@@ -229,65 +307,49 @@ const getMonthlyEarningsSummary = async (
                         },
                     },
                     payoutItem: {
-                        select: { id: true, payoutId: true },
+                        select: {
+                            id: true,
+                            payoutId: true,
+                            consultationAmount: true,
+                            platformFee: true,
+                            doctorAmount: true,
+                            payout: { select: { status: true, paidAt: true } },
+                        },
                     },
                 },
             });
 
-            const eligible = appointments.filter((apt) => getEligiblePayment(apt) !== null);
+            const aggregate = aggregateDoctorEarnings(appointments);
+            const payoutHistory = await prisma.doctorPayout.findMany({
+                where: {
+                    doctorId: doc.id,
+                    ...(dateRange && {
+                        periodStart: { lte: dateRange.periodEndDateOnly },
+                        periodEnd: { gte: dateRange.periodStartDateOnly },
+                    }),
+                },
+                select: { id: true, periodStart: true, periodEnd: true, status: true, netAmount: true, paidAt: true },
+                orderBy: { createdAt: "desc" },
+            });
+            const formatted = formatDoctorEarningsAggregate(aggregate);
 
-            let gross = new Prisma.Decimal(0);
-            let platformFee = new Prisma.Decimal(0);
-            let net = new Prisma.Decimal(0);
-            let unpaidBalance = new Prisma.Decimal(0);
-
-            for (const apt of eligible) {
-                const payment = getEligiblePayment(apt)!;
-                const calc = calculateConsultationEarnings(payment.amount);
-                gross = gross.add(calc.consultationAmount);
-                platformFee = platformFee.add(calc.platformFee);
-                net = net.add(calc.doctorAmount);
-
-                if (!apt.payoutItem) {
-                    unpaidBalance = unpaidBalance.add(calc.doctorAmount);
-                }
-            }
-
-            const existingPayout = dateRange
-                ? await prisma.doctorPayout.findUnique({
-                    where: {
-                        doctorId_periodStart_periodEnd: {
-                            doctorId: doc.id,
-                            periodStart: dateRange.periodStartDateOnly,
-                            periodEnd: dateRange.periodEndDateOnly,
-                        },
-                    },
-                    select: {
-                        id: true,
-                        status: true,
-                        netAmount: true,
-                        paidAt: true,
-                    },
-                })
-                : null;
-
+            const hasUnallocatedEarnings = formatted.unallocatedAmount !== "0.00";
             return {
                 doctorId: doc.id,
                 doctorName: doc.user.name,
                 doctorEmail: doc.user.email,
-                totalConsultations: eligible.length,
-                grossAmount: gross.toFixed(2),
-                platformFee: platformFee.toFixed(2),
-                netAmount: net.toFixed(2),
-                unpaidBalance: unpaidBalance.toFixed(2),
-                payout: existingPayout
-                    ? {
-                        id: existingPayout.id,
-                        status: existingPayout.status,
-                        netAmount: existingPayout.netAmount.toFixed(2),
-                        paidAt: existingPayout.paidAt,
-                    }
-                    : null,
+                ...formatted,
+                payoutStatus: hasUnallocatedEarnings ? PayoutStatus.PENDING : (payoutHistory[0]?.status ?? null),
+                hasUnallocatedEarnings,
+                canGeneratePayout: hasUnallocatedEarnings,
+                ledgerConsistency: {
+                    isConsistent: findLedgerMismatches(appointments).length === 0,
+                    mismatches: findLedgerMismatches(appointments),
+                },
+                payoutHistory: payoutHistory.map((payout) => ({
+                    ...payout,
+                    netAmount: payout.netAmount.toFixed(2),
+                })),
             };
         }),
     );
@@ -330,7 +392,6 @@ const getDoctorPayable = async (
         where: {
             doctorId,
             status: AppointmentStatus.COMPLETED,
-            payoutItem: null,
             ...(dateRange && slotStartInEarningsRange(dateRange)),
         },
         include: {
@@ -338,7 +399,29 @@ const getDoctorPayable = async (
             slot: { select: { startTime: true, endTime: true } },
             payments: {
                 where: { purpose: TransactionPurpose.APPOINTMENT, status: TransactionStatus.PAID },
-                select: { purpose: true, status: true, amount: true, refundStatus: true, refundedAt: true },
+                select: {
+                    id: true,
+                    purpose: true,
+                    status: true,
+                    amount: true,
+                    currency: true,
+                    provider: true,
+                    providerTransactionId: true,
+                    stripePaymentIntentId: true,
+                    refundStatus: true,
+                    refundedAt: true,
+                    paidAt: true,
+                },
+            },
+            payoutItem: {
+                select: {
+                    id: true,
+                    payoutId: true,
+                    consultationAmount: true,
+                    platformFee: true,
+                    doctorAmount: true,
+                    payout: { select: { status: true, paidAt: true } },
+                },
             },
         },
         orderBy: { createdAt: "asc" },
@@ -346,16 +429,11 @@ const getDoctorPayable = async (
 
     const eligible = appointments.filter((apt) => getEligiblePayment(apt) !== null);
 
-    let gross = new Prisma.Decimal(0);
-    let platformFee = new Prisma.Decimal(0);
-    let net = new Prisma.Decimal(0);
+    const aggregate = aggregateDoctorEarnings(appointments);
 
     const eligibleAppointments = eligible.map((apt) => {
         const payment = getEligiblePayment(apt)!;
         const calc = calculateConsultationEarnings(payment.amount);
-        gross = gross.add(calc.consultationAmount);
-        platformFee = platformFee.add(calc.platformFee);
-        net = net.add(calc.doctorAmount);
 
         return {
             appointmentId: apt.id,
@@ -364,32 +442,57 @@ const getDoctorPayable = async (
             consultationAmount: calc.consultationAmount.toFixed(2),
             platformFee: calc.platformFee.toFixed(2),
             doctorAmount: calc.doctorAmount.toFixed(2),
+            payment: {
+                id: payment.id,
+                amount: payment.amount.toFixed(2),
+                currency: payment.currency,
+                status: payment.status,
+                provider: payment.provider,
+                providerTransactionId: payment.providerTransactionId,
+                stripePaymentIntentId: payment.stripePaymentIntentId,
+                refundStatus: payment.refundStatus,
+                refundedAt: payment.refundedAt,
+                paidAt: payment.paidAt,
+            },
+            payoutItem: apt.payoutItem
+                ? {
+                    id: apt.payoutItem.id,
+                    payoutId: apt.payoutItem.payoutId,
+                    status: apt.payoutItem.payout.status,
+                    paidAt: apt.payoutItem.payout.paidAt,
+                    consultationAmount: apt.payoutItem.consultationAmount.toFixed(2),
+                    platformFee: apt.payoutItem.platformFee.toFixed(2),
+                    doctorAmount: apt.payoutItem.doctorAmount.toFixed(2),
+                }
+                : null,
         };
     });
 
-    const existingPayout = dateRange
-        ? await prisma.doctorPayout.findUnique({
-            where: {
-                doctorId_periodStart_periodEnd: {
-                    doctorId,
-                    periodStart: dateRange.periodStartDateOnly,
-                    periodEnd: dateRange.periodEndDateOnly,
-                },
-            },
-            select: payoutSelect,
-        })
-        : null;
+    const payoutHistory = await prisma.doctorPayout.findMany({
+        where: {
+            doctorId,
+            ...(dateRange && {
+                periodStart: { lte: dateRange.periodEndDateOnly },
+                periodEnd: { gte: dateRange.periodStartDateOnly },
+            }),
+        },
+        select: payoutSelect,
+        orderBy: { createdAt: "desc" },
+    });
 
     return {
         doctorId: doctor.id,
         doctorName: doctor.user.name,
         doctorEmail: doctor.user.email,
-        consultationCount: eligible.length,
-        grossAmount: gross.toFixed(2),
-        platformFee: platformFee.toFixed(2),
-        netAmount: net.toFixed(2),
+        consultationCount: aggregate.eligibleConsultations,
+        ...formatDoctorEarningsAggregate(aggregate),
+        ledgerConsistency: {
+            isConsistent: findLedgerMismatches(appointments).length === 0,
+            mismatches: findLedgerMismatches(appointments),
+        },
         eligibleAppointments,
-        existingPayout,
+        existingPayout: payoutHistory[0] ?? null,
+        payoutHistory,
     };
 };
 
@@ -423,78 +526,29 @@ const generateMonthlyPayout = async (
         input.month,
     );
 
-    // Idempotency check: return existing payout if already generated for this doctor & period
-    const existingPayout = await prisma.doctorPayout.findUnique({
-        where: {
-            doctorId_periodStart_periodEnd: {
-                doctorId,
-                periodStart: periodStartDateOnly,
-                periodEnd: periodEndDateOnly,
-            },
-        },
-        select: payoutSelect,
-    });
-
-    if (existingPayout) {
-        return {
-            isIdempotent: true,
-            message: "Doctor payout for this period already exists",
-            payout: existingPayout,
-        };
-    }
-
-    const appointments = await prisma.appointment.findMany({
-        where: {
-            doctorId,
-            status: AppointmentStatus.COMPLETED,
-            payoutItem: null,
-            ...slotStartInEarningsRange({ periodStart, periodEnd }),
-        },
-        include: {
-            payments: {
-                where: { purpose: TransactionPurpose.APPOINTMENT, status: TransactionStatus.PAID },
-                select: { purpose: true, status: true, amount: true, refundStatus: true, refundedAt: true },
-            },
-        },
-    });
-
-    const eligible = appointments.filter((apt) => getEligiblePayment(apt) !== null);
-
-    if (eligible.length === 0) {
-        throw new AppError("No eligible completed paid consultations found for this period", 400);
-    }
-
     const createPayout = () => prisma.$transaction(async (tx) => {
-        // Concurrency guard
-        const recheck = await tx.doctorPayout.findUnique({
-            where: {
-                doctorId_periodStart_periodEnd: {
-                    doctorId,
-                    periodStart: periodStartDateOnly,
-                    periodEnd: periodEndDateOnly,
+        const appointments = await tx.appointment.findMany({
+            where: { doctorId, status: AppointmentStatus.COMPLETED, payoutItem: null, ...slotStartInEarningsRange({ periodStart, periodEnd }) },
+            include: {
+                payments: {
+                    where: { purpose: TransactionPurpose.APPOINTMENT, status: TransactionStatus.PAID },
+                    select: { purpose: true, status: true, amount: true, refundStatus: true, refundedAt: true },
                 },
             },
-            select: payoutSelect,
         });
+        const eligible = appointments.filter((apt) => getEligiblePayment(apt) !== null);
+        if (eligible.length === 0) return null;
 
-        if (recheck) {
-            return {
-                isIdempotent: true,
-                message: "Doctor payout for this period already exists",
-                payout: recheck,
-            };
-        }
-
-        let totalGross = new Prisma.Decimal(0);
-        let totalFee = new Prisma.Decimal(0);
-        let totalNet = new Prisma.Decimal(0);
+        const latest = await tx.doctorPayout.findFirst({
+            where: { doctorId, periodStart: periodStartDateOnly, periodEnd: periodEndDateOnly },
+            orderBy: { payoutSequence: "desc" },
+            select: { payoutSequence: true },
+        });
+        const payoutSequence = (latest?.payoutSequence ?? 0) + 1;
 
         const itemsData = eligible.map((apt) => {
             const payment = getEligiblePayment(apt)!;
             const calc = calculateConsultationEarnings(payment.amount);
-            totalGross = totalGross.add(calc.consultationAmount);
-            totalFee = totalFee.add(calc.platformFee);
-            totalNet = totalNet.add(calc.doctorAmount);
 
             return {
                 appointmentId: apt.id,
@@ -503,12 +557,17 @@ const generateMonthlyPayout = async (
                 doctorAmount: calc.doctorAmount,
             };
         });
+        const aggregate = aggregateDoctorEarnings(eligible);
+        const totalGross = aggregate.grossAmount;
+        const totalFee = aggregate.platformFee;
+        const totalNet = aggregate.netAmount;
 
         const created = await tx.doctorPayout.create({
             data: {
                 doctorId,
                 periodStart: periodStartDateOnly,
                 periodEnd: periodEndDateOnly,
+                payoutSequence,
                 totalConsultations: eligible.length,
                 grossAmount: totalGross,
                 platformFee: totalFee,
@@ -537,6 +596,7 @@ const generateMonthlyPayout = async (
                     netAmount: totalNet.toString(),
                     periodStart: periodStartDateOnly.toISOString(),
                     periodEnd: periodEndDateOnly.toISOString(),
+                    payoutSequence,
                 },
                 metadata: { doctorId },
             },
@@ -544,23 +604,32 @@ const generateMonthlyPayout = async (
 
         return {
             isIdempotent: false,
-            message: "Doctor payout generated successfully",
+            message: payoutSequence === 1 ? "Doctor payout generated successfully" : "Supplemental doctor payout generated successfully",
             payout: created,
         };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-            return await createPayout();
+            const result = await createPayout();
+            if (result) return result;
+            const existingPayout = await prisma.doctorPayout.findFirst({
+                where: { doctorId, periodStart: periodStartDateOnly, periodEnd: periodEndDateOnly },
+                orderBy: { payoutSequence: "desc" },
+                select: payoutSelect,
+            });
+            if (existingPayout) return { isIdempotent: true, message: "No unallocated eligible consultations found for this period", payout: existingPayout };
+            throw new AppError("No eligible completed paid consultations found for this period", 400);
         } catch (error) {
             if (!isRetryablePayoutGenerationConflict(error)) throw error;
-            const concurrent = await prisma.doctorPayout.findUnique({
-                where: { doctorId_periodStart_periodEnd: { doctorId, periodStart: periodStartDateOnly, periodEnd: periodEndDateOnly } },
+            const concurrent = await prisma.doctorPayout.findFirst({
+                where: { doctorId, periodStart: periodStartDateOnly, periodEnd: periodEndDateOnly },
+                orderBy: { payoutSequence: "desc" },
                 select: payoutSelect,
             });
             if (concurrent) return {
                 isIdempotent: true,
-                message: "Doctor payout for this period already exists",
+                message: "Another payout generation request completed first",
                 payout: concurrent,
             };
             if (attempt === 2) throw error;
@@ -573,6 +642,7 @@ export const doctorPayoutAdminService = {
     listPayouts,
     getPayout,
     sendPayout,
+    getCheckoutStatus,
     getMonthlyEarningsSummary,
     getDoctorPayable,
     generateMonthlyPayout,
