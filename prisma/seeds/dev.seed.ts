@@ -974,10 +974,11 @@ async function main() {
   });
 
   const seedPayoutWhere = {
-    doctorId_periodStart_periodEnd: {
+    doctorId_periodStart_periodEnd_payoutSequence: {
       doctorId: doctor1ProfileId,
       periodStart: new Date("2026-10-01T00:00:00Z"),
       periodEnd: new Date("2026-10-15T00:00:00Z"),
+      payoutSequence: 1,
     },
   };
   const existingSeedPayout = await prisma.doctorPayout.findUnique({ where: seedPayoutWhere, select: { id: true, status: true } });

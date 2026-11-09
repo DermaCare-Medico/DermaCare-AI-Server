@@ -44,6 +44,17 @@ const getPayout = async (req: Request, res: Response) => res.status(HTTP_STATUS.
     data: await doctorPayoutAdminService.getPayout(getUserId(req), req.params.id!),
 });
 
+const getCheckoutStatus = async (req: Request, res: Response) => res.status(HTTP_STATUS.OK).json({
+    success: true,
+    statusCode: HTTP_STATUS.OK,
+    message: "Doctor payout Checkout status retrieved successfully",
+    data: await doctorPayoutAdminService.getCheckoutStatus(
+        getUserId(req),
+        req.params.payoutId!,
+        req.query.session_id as string,
+    ),
+});
+
 const getMonthlyEarningsSummary = async (req: Request, res: Response) => {
     const result = await doctorPayoutAdminService.getMonthlyEarningsSummary(getUserId(req), {
         page: Number(req.query.page) || 1,
@@ -103,6 +114,7 @@ const generatePayout = async (req: Request, res: Response) => {
 export const doctorPayoutAdminController = {
     listPayouts,
     getPayout,
+    getCheckoutStatus,
     sendPayout,
     getMonthlyEarningsSummary,
     getDoctorPayable,

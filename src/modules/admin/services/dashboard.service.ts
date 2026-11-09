@@ -34,7 +34,7 @@ type FinancialAppointment = {
 
 export const calculateDashboardFinancials = (
     appointments: FinancialAppointment[],
-    _paidPayoutAmounts: Prisma.Decimal[],
+    paidPayoutAmounts: Prisma.Decimal[],
     successfulRefundAmounts: Prisma.Decimal[],
     now = new Date(),
 ) => {
@@ -56,7 +56,10 @@ export const calculateDashboardFinancials = (
         }
     }
 
-    const doctorPayoutsPaid = aggregate.paidAmount;
+    const doctorPayoutsPaid = paidPayoutAmounts.reduce(
+        (total, amount) => total.add(amount),
+        new Prisma.Decimal(0),
+    );
     const totalSuccessfulRefunds = successfulRefundAmounts.reduce(
         (total, amount) => total.add(amount),
         new Prisma.Decimal(0),
@@ -90,7 +93,7 @@ const getDashboard = async (userId: string) => {
     if (!admin) throw new AppError("Only active administrators may access the dashboard", 403);
 
     const [patients, doctors, pendingDoctorApprovals, appointments, orders,
-        consultationAppointments, successfulRefunds] =
+        consultationAppointments, paidPayouts, successfulRefunds] =
         await prisma.$transaction([
             prisma.user.count({
                 where: {
@@ -147,6 +150,10 @@ const getDashboard = async (userId: string) => {
                     },
                 },
             }),
+            prisma.doctorPayout.findMany({
+                where: { status: PayoutStatus.PAID },
+                select: { netAmount: true },
+            }),
             prisma.paymentTransaction.findMany({
                 where: {
                     purpose: TransactionPurpose.APPOINTMENT,
@@ -161,7 +168,7 @@ const getDashboard = async (userId: string) => {
 
     const financialOverview = calculateDashboardFinancials(
         consultationAppointments,
-        [],
+        paidPayouts.map(({ netAmount }) => netAmount),
         successfulRefunds.map(({ amount }) => amount),
     );
 

@@ -108,6 +108,7 @@ model DoctorPayout {
   doctorId             String       @map("doctor_id") @db.Uuid
   periodStart          DateTime     @map("period_start") @db.Date
   periodEnd            DateTime     @map("period_end") @db.Date
+  payoutSequence       Int          @default(1) @map("payout_sequence")
   totalConsultations   Int          @default(0) @map("total_consultations")
   grossAmount          Decimal      @map("gross_amount") @db.Decimal(10, 2)
   platformFee          Decimal      @default(0) @map("platform_fee") @db.Decimal(10, 2)
@@ -125,7 +126,7 @@ model DoctorPayout {
   paidByAdmin User?         @relation("DoctorPayoutPaidByAdmin", fields: [paidByAdminId], references: [id], onDelete: Restrict)
   items  DoctorPayoutItem[]
 
-  @@unique([doctorId, periodStart, periodEnd])
+  @@unique([doctorId, periodStart, periodEnd, payoutSequence])
   @@index([status])
   @@map("doctor_payouts")
 }
