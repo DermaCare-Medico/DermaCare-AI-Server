@@ -62,11 +62,17 @@ export const slotStartInEarningsRange = (range: { periodStart: Date; periodEnd: 
 });
 
 export interface PaymentRecord {
+  id?: string;
   purpose: TransactionPurpose;
   status: TransactionStatus;
   amount: Prisma.Decimal;
+  currency?: string;
+  provider?: string | null;
+  providerTransactionId?: string | null;
+  stripePaymentIntentId?: string | null;
   refundStatus?: RefundStatus | null;
   refundedAt?: Date | null;
+  paidAt?: Date | null;
 }
 
 export interface AppointmentRecordForEarnings {
